@@ -1,0 +1,10 @@
+{
+  "IsEncrypted": false,
+  "Values": {
+    "FUNCTIONS_WORKER_RUNTIME": "python",
+    "AzureWebJobsStorage": "UseDevelopmentStorage=true",
+    "CRON_INGESTA": "0 0 13-21 * * 1-5",
+    "BRONZE_CONTAINER": "bronze",
+    "BRONZE_CONNECTION_STRING": "UseDevelopmentStorage=true"
+  }
+}

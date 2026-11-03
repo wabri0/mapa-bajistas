@@ -11,11 +11,11 @@ Proyecto final · Track B (Arquitectura técnica) · Entrega: 10-ene-2027. Plann
 | `data/raw/` | Ficheros originales de la CNMV (bronze). No se versionan |
 | `data/processed/` | Datos limpios (silver) en local. No se versionan |
 | `scripts/` | Análisis puntuales, como la validación de la fase 0 |
-| `src/ingesta/` | Descarga y hash del Excel (fase 1) |
+| `src/ingesta/` | Descarga, validación y guardado del Excel en bronze (fase 1) |
 | `src/limpieza/` | Limpieza y serie diaria (fase 2) |
 | `src/modelo/` | Modelo en estrella y carga en SQL (fase 3) |
 | `src/alertas/` | Indicadores y reglas de alerta (fase 4) |
-| `functions/` | Azure Functions |
+| `function_app.py`, `host.json` | Azure Function que lanza la ingesta (la raíz del repo es la app) |
 | `sql/` | Esquema, RLS y consultas |
 | `powerbi/` | Panel de Power BI (fase 5) |
 | `tests/` | Pruebas y controles de calidad |
@@ -26,9 +26,10 @@ Proyecto final · Track B (Arquitectura técnica) · Entrega: 10-ene-2027. Plann
 ## Cómo empezar
 
 ```
-pip install -r requirements.txt
-curl -o data/raw/NetShortPositions_$(date +%F).xls https://www.cnmv.es/DocPortal/Posiciones-Cortas/NetShortPositions.xls
-python scripts/fase0_explorar.py data/raw/NetShortPositions_<fecha>.xls
+python -m venv .venv
+.venv/Scripts/pip install -r requirements.txt -r requirements-dev.txt
+.venv/Scripts/python -m src.ingesta.ejecutar     # descarga y guarda en data/raw/cnmv/...
+.venv/Scripts/python -m pytest                   # pruebas
 ```
 
 ## Fuente de los datos

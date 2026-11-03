@@ -1,0 +1,11 @@
+.git*
+.venv
+.vscode
+local.settings.json
+data
+docs
+scripts
+tests
+powerbi
+sql
+README.md
