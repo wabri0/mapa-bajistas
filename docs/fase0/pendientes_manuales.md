@@ -4,13 +4,16 @@ Estas tareas necesitan tu cuenta o tu contacto directo. Al terminar cada una, ma
 
 ## Paso 4 · Azure for Students
 
-- [ ] Entra en https://azure.microsoft.com/free/students con el correo de la universidad. Comprueba que **no pide tarjeta** y anota el crédito y la fecha de caducidad que te dan.
-      Si pide tarjeta o no la aprueban → plan B (GitHub Actions + SQLite) y apúntalo aquí.
-- [ ] Crea un grupo de recursos: Portal → *Resource groups* → *Create*.
+- [x] Alta en Azure for Students (3-nov-2026): **crédito disponible 100 US$ de 100 US$**. Plan B descartado.
+      Falta anotar la fecha de caducidad del crédito (aparece en el portal, en la ficha de la suscripción).
+- [x] **Hecho 3-nov-2026.** Suscripción en el directorio de la Universidad Alfonso X el Sabio (cuenta `@myuax.com`), rol Propietario.
+- [x] **Hecho 3-nov-2026:** grupo de recursos `rg-mapa-bajistas` en West Europe, con las etiquetas de abajo.
+      Pasos usados: Portal → *Resource groups* → *Create*.
       - Nombre: `rg-mapa-bajistas`
       - Región: **West Europe**. Si la política de la suscripción no la permite, usa la que te deje y anótala, porque afecta a los costes de la fase 6.
       - Etiquetas: `proyecto=mapa-bajistas`, `entorno=prototipo`
-- [ ] Crea la alerta de presupuesto: *Cost Management* → *Budgets* → *Add*.
+- [x] **Hecho 3-nov-2026:** presupuesto `presupuesto-1`, de 1 al mes, con alertas de coste real al 50 % y al 100 % y de coste previsto al 100 %.
+      Ojo: está en la suscripción → *Administración de costos* → *Presupuestos*, no en *Administración de costos + facturación*.
       - Ámbito: la suscripción
       - Importe: 1, con reinicio mensual (la moneda puede ser USD; da igual)
       - Alertas: 50 %, 100 % y previsión del 100 %, con aviso a tu correo
