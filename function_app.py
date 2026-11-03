@@ -13,6 +13,8 @@ from src.ingesta.almacen import AlmacenBlob
 from src.ingesta.ejecutar import ErrorIngesta, ingestar
 
 app = func.FunctionApp()
+# El SDK de Azure registra cada cabecera HTTP a nivel INFO: ruido y coste en Application Insights
+logging.getLogger("azure").setLevel(logging.WARNING)
 
 
 @app.timer_trigger(schedule="%CRON_INGESTA%", arg_name="temporizador", run_on_startup=False, use_monitor=True)
