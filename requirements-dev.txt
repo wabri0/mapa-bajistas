@@ -1,1 +1,3 @@
+# Desarrollo, pruebas y análisis local
+pandas>=2.2
 pytest>=8

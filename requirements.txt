@@ -1,8 +1,6 @@
-# Azure Function (ingesta)
+# Dependencias de la Azure Function (se empaquetan en cada despliegue)
 azure-functions>=1.20
 azure-storage-blob>=12.20
 azure-identity>=1.17
 requests>=2.32
 xlrd>=2.0
-# Análisis y fases siguientes
-pandas>=2.2
