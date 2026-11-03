@@ -1,0 +1,21 @@
+# Datos: se descargan de la CNMV, no se versionan
+data/raw/*
+data/processed/*
+!data/**/.gitkeep
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+venv/
+.env
+local.settings.json
+
+# Power BI y Office
+~$*
+*.pbix.bak
+
+# Sistema y editor
+.DS_Store
+Thumbs.db
+.vscode/

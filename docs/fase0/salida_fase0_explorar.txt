@@ -1,0 +1,119 @@
+Fichero: data/raw/NetShortPositions_2026-11-02.xls
+
+== vigentes: 63 filas
+  fechas de posición: 2025-04-04 -> 2026-10-30
+  emisores 31 | LEI 31 | ISIN 32 (en mayúsculas: 32) | tenedores 36
+  % mín/máx 0.5 / 2.41 | filas < 0.5 %: 0 | filas = 0: 0
+  duplicados exactos: 1 | ISIN escritos en minúsculas: 0 | nulos: 0
+
+== serie: 1720 filas
+  fechas de posición: 2011-02-02 -> 2026-10-30
+  emisores 31 | LEI 31 | ISIN 34 (en mayúsculas: 32) | tenedores 36
+  % mín/máx 0.47 / 4.21 | filas < 0.5 %: 2 | filas = 0: 0
+  duplicados exactos: 2 | ISIN escritos en minúsculas: 2 | nulos: 0
+
+== anteriores: 12887 filas
+  fechas de posición: 2010-06-10 -> 2026-10-29
+  emisores 80 | LEI 80 | ISIN 115 (en mayúsculas: 90) | tenedores 223
+  % mín/máx 0.0 / 4.49 | filas < 0.5 %: 778 | filas = 0: 93
+  duplicados exactos: 1892 | ISIN escritos en minúsculas: 90 | nulos: 0
+
+Histórico único (serie + anteriores, sin duplicados): 12360 notificaciones, 80 emisores, 229 tenedores, 90 ISIN
+Solape serie/anteriores: 359 filas, mismo % en el 100%
+
+Notificaciones por año:
+fecha  2010  2011  2012  2013  2014  2015  2016  2017  2018  2019  2020  2021  2022  2023  2024  2025  2026
+n        95   305   290   381   556  1233  1059   982  1412   802   617   642   515   612   815   837  1207
+
+Emisores con varios ISIN (operaciones corporativas):
+  AENA, S.M.E., S.A.: ES0105046009, ES0105046017
+  AMPER, S.A.: ES0109260291, ES0109260531, ES0609260973
+  COLONIAL SFL, SOCIMI, S.A.: ES0139140042, ES0139140174
+  DURO FELGUERA, S.A.: ES0162600003, ES0162600417
+  GRIFOLS, S.A.: ES0171996012, ES0171996087
+  PHARMA MAR, S.A.: ES0169501022, ES0169501030
+  PROMOTORA DE INFORMACIONES, S.A.: ES0171743117, ES0171743901
+  PROSEGUR, COMPAÑIA DE SEGURIDAD, S.A.: ES0175438003, ES0175438235
+  REDEIA CORPORACION, S.A.: ES0173093024, ES0173093115
+
+Validación contra vigentes: 31 de 38 ISIN cuadran
+              reconstruido  vigentes_cnmv
+isin                                     
+ES0109260531          2.60           2.02
+ES0139140042          0.50           0.00
+ES0169501030          1.61           0.00
+ES0171996012          1.65           0.00
+ES0173093115          0.59           0.00
+ES0175438235          0.57           0.00
+ES0609260973          0.73           0.00
+
+Ranking de vigentes por suma de posiciones:
+                                       suma_pct  fondos
+emisor                                                 
+SOLARIA ENERGIA Y MEDIOAMBIENTE, S.A.      8.13       8
+ENAGAS, S.A.                               4.21       6
+TECNICAS REUNIDAS, S.A.                    3.91       4
+AMPER, S.A.                                3.31       5
+VISCOFAN, S.A.                             3.10       4
+
+######## GRIFOLS clase A (ES0171996087)
+     fecha                                tenedor  pct
+2023-11-10 Millennium International Management LP 0.60
+2023-11-15 Millennium International Management LP 0.56
+2024-01-08        General Industrial Partners LLP 0.57
+2024-01-09        General Industrial Partners LLP 0.06
+2024-01-16 Millennium International Management LP 0.53
+2024-01-18 Millennium International Management LP 0.66
+2024-01-29       Qube Research & Technologies Ltd 0.50
+2024-01-30                        WorldQuant, LLC 0.51
+2024-02-02       Qube Research & Technologies Ltd 0.61
+2024-02-08       Qube Research & Technologies Ltd 0.71
+2024-02-09       Qube Research & Technologies Ltd 1.19
+2024-02-12       Qube Research & Technologies Ltd 1.23
+2024-02-20       Qube Research & Technologies Ltd 1.31
+2024-02-21                        WorldQuant, LLC 0.50
+2024-02-22       Qube Research & Technologies Ltd 1.29
+2024-02-23       Qube Research & Technologies Ltd 1.32
+2024-02-23                        WorldQuant, LLC 0.50
+2024-02-29 Millennium International Management LP 0.50
+2024-02-29       Qube Research & Technologies Ltd 1.62
+2024-03-01                        AKO Capital LLP 0.59
+2024-03-01       Qube Research & Technologies Ltd 1.46
+2024-03-04       Qube Research & Technologies Ltd 1.57
+2024-03-04 Millennium International Management LP 0.62
+2024-03-06                      Marshall Wace LLP 0.51
+2024-03-07                      Marshall Wace LLP 0.61
+2024-03-07       Qube Research & Technologies Ltd 1.47
+2024-03-08 Millennium International Management LP 0.52
+2024-03-11       Qube Research & Technologies Ltd 1.51
+2024-03-14       Qube Research & Technologies Ltd 1.66
+2024-03-15                        AKO Capital LLP 0.51
+2024-03-18       Qube Research & Technologies Ltd 0.96
+2024-03-21 Millennium International Management LP 0.61
+2024-03-22       Qube Research & Technologies Ltd 1.01
+2024-03-22                        AKO Capital LLP 0.60
+2024-03-26       Qube Research & Technologies Ltd 0.34
+
+Suma publicada en fechas clave:
+            suma_pct  fondos
+2023-10-31      2.06       4
+2023-12-29      2.12       4
+2024-01-08      2.69       5
+2024-01-09      2.12       4
+2024-01-31      2.72       5
+2024-02-29      3.67       5
+2024-03-14      4.38       6
+2024-03-29      2.82       5
+2024-05-31      2.39       4
+Media sep-dic 2023: 2.09 % | media feb-mar 2024: 3.53 %
+AQR en Grifols (hueco 2018-2024 sin notificaciones): 2018-03-20 0.5, 2018-05-21 0.5, 2018-05-31 0.5, 2018-07-09 0.5, 2018-08-15 0.5, 2024-08-14 0.5, 2025-04-15 0.5, 2026-04-24 0.5, 2026-05-20 0.47
+
+######## SOLARIA (ES0165386014)
+Primera notificación: 2018-06-07
+Máximo de la suma: 16.57 % el 2024-12-19
+Máximo de fondos: 19 el 2024-12-12
+Último día: {'suma_pct': 8.13, 'fondos': 8.0}
+Máximo anual de suma y fondos:
+          2018  2019  2020   2021  2022   2023   2024   2025   2026
+suma_pct   1.6  2.26   3.9   8.77   8.7  10.92  16.57  16.51   9.23
+fondos     3.0  4.00   5.0  11.00  12.0  12.00  19.00  19.00  12.00
