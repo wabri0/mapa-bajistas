@@ -43,6 +43,12 @@ Cada vez que llega un fichero nuevo, la plataforma lo convierte en cinco tablas 
 
 **Grupos gestores.** La CNMV identifica a la entidad legal que notifica (por ejemplo, *Citadel Advisors LLC* o *Citadel Europe LLP*). A una cotizada le interesa la casa que hay detrás. Una tabla revisada a mano (`src/limpieza/grupos_gestores.csv`) asigna 52 entidades a 22 grupos con varias entidades; por ejemplo, Man Group reúne GLG, AHL y Man Investments. Ante la duda, no se une: *Polar Capital* y *Polar Asset Management Partners* son gestoras distintas, y *Citadel Securities* es una empresa distinta del fondo *Citadel*.
 
+**Entidades nuevas.** Cuando aparece una entidad que no está en la tabla, nunca se bloquea nada: cuenta como su propio grupo y los datos se publican igual. En cada ejecución, el informe de calidad (`calidad.json`) lista:
+- los **fondos nuevos**, los que no estaban en la captura anterior;
+- los **grupos por revisar**: entidades no revisadas cuyo nombre comparte marca con otra de distinto grupo, junto con el grupo sugerido. Por ejemplo, un *Citadel Advisors III LLC* nuevo aparecería con la sugerencia «Citadel».
+
+La marca es la primera palabra distintiva del nombre, sin formas jurídicas (LLC, LLP…) ni términos genéricos (Capital, Management…). No se agrupa de forma automática porque el nombre engaña, como muestran Polar o Two Sigma frente a Two Creeks. Una persona decide, añade la línea a la tabla y, en la siguiente ejecución, todo el histórico se recalcula con el grupo correcto. Una entidad independiente se marca como revisada asignándole su propio nombre como grupo. La Function registra el aviso `INGESTA_CNMV_REVISAR`.
+
 **Controles de calidad.** En cada ejecución se comprueban:
 - duplicados y conflictos;
 - LEI con formato inválido, ISIN inválidos, porcentajes fuera de 0–100 % y fechas fuera de rango;

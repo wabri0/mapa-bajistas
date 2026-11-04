@@ -184,3 +184,43 @@ def test_segunda_ejecucion_fecha_solo_las_notificaciones_nuevas(tmp_path):
     assert informe["notificaciones_nuevas"] == nuevas
     notif = pd.read_parquet(tmp_path / "silver" / "cnmv" / "notificaciones.parquet")
     assert notif["fecha_primera_captura"].notna().sum() == nuevas
+
+
+def test_marca_ignora_formas_juridicas_y_palabras_genericas():
+    assert silver.marca("Citadel Advisors III LLC") == silver.marca("Citadel Europe LLP") == "citadel"
+    assert silver.marca("D. E. Shaw & Co., L.P.") == "shaw"
+
+
+def test_entidad_nueva_de_una_casa_conocida_queda_pendiente_sin_bloquear():
+    notif, _, _ = silver.limpiar(filas(
+        (ANT, LEI_A, "ES0000000001", "Citadel Advisors LLC", "2026-10-01", 0.6),
+        (ANT, LEI_A, "ES0000000001", "Citadel Advisors III LLC", "2026-10-01", 0.6),   # nueva, no revisada
+        (ANT, LEI_A, "ES0000000001", "Gestora Independiente LLP", "2026-10-01", 0.6),  # nueva, sin parecidos
+    ))
+    fondos = silver.tabla_fondos(notif)
+    grupos = fondos.set_index("tenedor")["grupo_gestor"]
+    assert grupos["Citadel Advisors III LLC"] == "Citadel Advisors III LLC"   # mientras tanto, grupo propio
+    assert silver.grupos_por_revisar(fondos) == [
+        {"tenedor": "Citadel Advisors III LLC", "grupos_posibles": ["Citadel"]}]
+
+
+def test_las_entidades_revisadas_no_vuelven_a_avisar():
+    nombres = pd.read_csv(silver.GRUPOS)["tenedor"]
+    notif = pd.DataFrame({"tenedor": nombres, "fecha_posicion": pd.Timestamp("2026-10-01"), "pct": 0.6})
+    assert silver.grupos_por_revisar(silver.tabla_fondos(notif)) == []
+
+
+@requiere_excel
+def test_fichero_real_sin_grupos_pendientes_y_detecta_fondos_nuevos(tmp_path):
+    from src.ingesta.ejecutar import ingestar
+
+    bronze, destino = AlmacenLocal(tmp_path / "bronze"), AlmacenLocal(tmp_path / "silver")
+    ingestar(bronze, contenido=EXCEL.read_bytes(), cabeceras={})
+    informe = silver.ejecutar(bronze, destino)
+    assert informe["grupos_por_revisar"] == [] and "fondos_nuevos" not in informe   # carga histórica
+
+    previas = pd.read_parquet(tmp_path / "silver" / "cnmv" / "notificaciones.parquet")
+    sin_wq = previas[previas["tenedor"] != "WorldQuant, LLC"]   # simula que WorldQuant aún no existía
+    destino.escribir_bytes("cnmv/notificaciones.parquet", silver.a_parquet(sin_wq), sobrescribir=True)
+    informe = silver.ejecutar(bronze, destino, captura_utc="2026-11-04T20:00:00+00:00")
+    assert informe["fondos_nuevos"] == ["WorldQuant, LLC"] and informe["criticos"] == []

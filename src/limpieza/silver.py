@@ -11,6 +11,8 @@ Reglas (documentadas en docs/informe/03_datos.md):
 """
 import io
 import json
+import re
+import unicodedata
 from datetime import date
 from pathlib import Path
 
@@ -21,7 +23,7 @@ from src.ingesta import cnmv
 
 PREFIJO = "cnmv"
 # Cambiarla obliga a reconstruir la silver en Azure aunque no llegue un fichero nuevo
-VERSION_REGLAS = "2026-11-04 caducidad-365"
+VERSION_REGLAS = "2026-11-04 caducidad-365 grupos-revision"
 UMBRAL = 0.5
 CADUCIDAD_DIAS = 365
 FECHA_MINIMA = pd.Timestamp("2010-01-01")
@@ -67,13 +69,45 @@ def limpiar(crudas):
     }
 
 
+# Palabras que no identifican a una gestora: formas jurídicas, sedes y términos genéricos del sector
+GENERICAS = set("""llc lp llp ltd limited inc sa sas plc the co company corp corporation ag ab sl uk europe
+european international management managment mangement asset assets capital partners partnership investment
+investments investors advisors advisers group global fund funds gestion holdings master financial services
+strategies trust national association bank am im sarl pte general partner being of as and london asia ireland
+singapore hong kong cayman switzerland spain difc hk securities gcs ii iii sociedade gestora""".split())
+
+
+def marca(nombre):
+    """Primera palabra distintiva del nombre: 'Citadel Europe LLP' -> 'citadel'."""
+    s = unicodedata.normalize("NFKD", nombre).encode("ascii", "ignore").decode().lower()
+    palabras = [p for p in re.split(r"[^a-z0-9]+", s) if len(p) > 1 and p not in GENERICAS]
+    return palabras[0] if palabras else s
+
+
 def tabla_fondos(notif):
+    """Fondos con su grupo gestor. Sin revisar en grupos_gestores.csv, el grupo es la propia entidad."""
     grupos = pd.read_csv(GRUPOS, encoding="utf-8")
     fondos = notif.groupby("tenedor").agg(
         primera=("fecha_posicion", "min"), ultima=("fecha_posicion", "max"), notificaciones=("pct", "size"))
     fondos = fondos.reset_index().merge(grupos[["tenedor", "grupo_gestor"]], on="tenedor", how="left")
+    fondos["grupo_revisado"] = fondos["grupo_gestor"].notna()
     fondos["grupo_gestor"] = fondos["grupo_gestor"].fillna(fondos["tenedor"])
     return fondos
+
+
+def grupos_por_revisar(fondos):
+    """Entidades sin revisar cuyo nombre comparte marca con otra de distinto grupo (p. ej. un Citadel nuevo).
+
+    No bloquea nada: mientras nadie la revise, la entidad cuenta como su propio grupo. Se da por
+    revisada al añadirla a grupos_gestores.csv (con su grupo, o consigo misma si es independiente).
+    """
+    marcas = fondos.assign(marca=fondos["tenedor"].map(marca))
+    pendientes = []
+    for f in marcas[~marcas["grupo_revisado"]].itertuples():
+        otros = marcas[(marcas["marca"] == f.marca) & (marcas["grupo_gestor"] != f.grupo_gestor)]
+        if len(otros):
+            pendientes.append({"tenedor": f.tenedor, "grupos_posibles": sorted(otros["grupo_gestor"].unique())})
+    return pendientes
 
 
 def tabla_emisores(notif):
@@ -157,6 +191,9 @@ def construir(libro, fecha_publicacion, captura_utc=None, previas=None):
         informe["notificaciones_nuevas"] = int(nuevas.sum())
     fondos = tabla_fondos(notif)
     notif = notif.merge(fondos[["tenedor", "grupo_gestor"]], on="tenedor", how="left")
+    if previas is not None and len(previas):
+        informe["fondos_nuevos"] = sorted(set(fondos["tenedor"]) - set(previas["tenedor"]))
+    informe["grupos_por_revisar"] = grupos_por_revisar(fondos)
 
     tramos = intervalos(notif, vigentes, fecha_publicacion)
     diarias = posiciones_diarias(tramos)

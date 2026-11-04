@@ -32,6 +32,10 @@ def ingesta_cnmv(temporizador: func.TimerRequest) -> None:
                 resultado["ruta"], silver.VERSION_REGLAS):
             calidad = silver.ejecutar(bronze, silver_almacen)
             logging.info("SILVER_CNMV_OK %s", json.dumps(calidad, ensure_ascii=False, default=str))
+            if calidad["grupos_por_revisar"]:
+                # Aviso, no error: los datos se publican igual; falta decidir el grupo en grupos_gestores.csv
+                logging.warning("INGESTA_CNMV_REVISAR Grupo gestor sin revisar: %s",
+                                json.dumps(calidad["grupos_por_revisar"], ensure_ascii=False))
     except ErrorIngesta as e:
         # El prefijo INGESTA_CNMV_FALLO es el que vigila la alerta de Application Insights
         logging.error("INGESTA_CNMV_FALLO %s: %s", type(e).__name__, e)
