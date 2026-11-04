@@ -186,7 +186,8 @@ def ejecutar(almacen_bronze, almacen_silver, captura_utc=None):
                                 captura_utc or estado["captura_utc"], previas)
     informe["origen_bronze"] = estado["ruta"]
     if informe["criticos"]:
-        almacen_silver.escribir_texto(f"{PREFIJO}/calidad_rechazada.json", json.dumps(informe, indent=2, default=str))
+        rechazo = f"{PREFIJO}/rechazos/calidad_{estado['fecha_publicacion']}_{Path(estado['ruta']).stem}.json"
+        almacen_silver.escribir_texto(rechazo, json.dumps(informe, indent=2, default=str))
         raise ErrorCalidad(f"Controles de calidad fallidos: {informe['criticos']}")
     for nombre in TABLAS:
         almacen_silver.escribir_bytes(f"{PREFIJO}/{nombre}.parquet", a_parquet(tablas[nombre]), sobrescribir=True)

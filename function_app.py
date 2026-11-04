@@ -24,8 +24,10 @@ def ingesta_cnmv(temporizador: func.TimerRequest) -> None:
     silver_almacen = AlmacenBlob.desde_entorno("silver")
     try:
         resultado = ingestar(bronze)
-        # La silver se rehace solo cuando llega un fichero nuevo (o si aún no existe)
-        if resultado["estado"] == "nuevo" or silver_almacen.leer_texto(f"{silver.PREFIJO}/calidad.json") is None:
+        # La silver se rehace si no corresponde al último fichero de bronze: llega uno nuevo,
+        # aún no existe o la última construcción falló (se reintenta cada hora)
+        calidad_previa = json.loads(silver_almacen.leer_texto(f"{silver.PREFIJO}/calidad.json") or "{}")
+        if calidad_previa.get("origen_bronze") != resultado["ruta"]:
             calidad = silver.ejecutar(bronze, silver_almacen)
             logging.info("SILVER_CNMV_OK %s", json.dumps(calidad, ensure_ascii=False, default=str))
     except ErrorIngesta as e:
