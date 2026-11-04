@@ -47,7 +47,7 @@ Cada vez que llega un fichero nuevo, la plataforma lo convierte en cinco tablas 
 - los **fondos nuevos**, los que no estaban en la captura anterior;
 - los **grupos por revisar**: entidades no revisadas cuyo nombre comparte marca con otra de distinto grupo, junto con el grupo sugerido. Por ejemplo, un *Citadel Advisors III LLC* nuevo aparecería con la sugerencia «Citadel».
 
-La marca es la primera palabra distintiva del nombre, sin formas jurídicas (LLC, LLP…) ni términos genéricos (Capital, Management…). No se agrupa de forma automática porque el nombre engaña, como muestran Polar o Two Sigma frente a Two Creeks. Una persona decide, añade la línea a la tabla y, en la siguiente ejecución, todo el histórico se recalcula con el grupo correcto. Una entidad independiente se marca como revisada asignándole su propio nombre como grupo. La Function registra el aviso `INGESTA_CNMV_REVISAR`.
+La marca es la primera palabra distintiva del nombre, sin formas jurídicas (LLC, LLP…) ni términos genéricos (Capital, Management…). No se agrupa de forma automática porque el nombre engaña, como muestran Polar o Two Sigma frente a Two Creeks. Una persona decide, añade la línea a la tabla y, en la siguiente ejecución, todo el histórico se recalcula con el grupo correcto. Una entidad independiente se marca como revisada asignándole su propio nombre como grupo. La Function registra el aviso `INGESTA_CNMV_REVISAR`, que la misma regla de alerta de la ingesta envía por correo; no hace falta una regla aparte ni tiene coste adicional.
 
 **Controles de calidad.** En cada ejecución se comprueban:
 - duplicados y conflictos;

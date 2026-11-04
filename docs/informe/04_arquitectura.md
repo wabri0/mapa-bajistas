@@ -45,7 +45,7 @@ Cada fichero lleva como metadatos sus huellas, la fecha de publicación, las cab
 - Hay fechas o porcentajes que no se pueden leer.
 - En un día laborable, el fichero lleva más de 4 días sin publicarse.
 
-La regla de alerta `alerta-ingesta-cnmv-fallo` de Application Insights vigila ese texto y cualquier ejecución fallida. Se evalúa cada hora y envía un correo al grupo de acciones `ag-mapa-bajistas-correo`. Avisa una vez cuando empieza el problema y otra cuando se resuelve. Coste: 0,50 US$ al mes.
+La regla de alerta `alerta-ingesta-cnmv-fallo` de Application Insights vigila ese texto, el aviso `INGESTA_CNMV_REVISAR` (entidad nueva cuyo grupo gestor hay que decidir; ver sección 3.2) y cualquier ejecución fallida. Se evalúa cada hora y envía un correo al grupo de acciones `ag-mapa-bajistas-correo`. Avisa una vez cuando empieza el problema y otra cuando se resuelve. Coste: 0,50 US$ al mes.
 
 **Calidad.** 9 pruebas automáticas cubren:
 - El fichero real es válido.
