@@ -4,3 +4,5 @@ azure-storage-blob>=12.20
 azure-identity>=1.17
 requests>=2.32
 xlrd>=2.0
+pandas>=2.2
+pyarrow>=21

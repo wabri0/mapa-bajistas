@@ -29,17 +29,25 @@ jobs:
         with:
           python-version: ${{ env.PYTHON_VERSION }}
 
+      # Con el Excel actual de la CNMV las pruebas con datos reales se ejecutan de verdad;
+      # si la CNMV no responde, esas pruebas se saltan y el resto sigue
+      - name: Download current CNMV file for tests
+        run: |
+          mkdir -p data/raw
+          curl -sSf -A "mapa-bajistas-ci" -o data/raw/NetShortPositions_ci.xls \
+            https://www.cnmv.es/DocPortal/Posiciones-Cortas/NetShortPositions.xls || rm -f data/raw/NetShortPositions_ci.xls
+
       - name: Run tests
         run: |
           pip install -r requirements.txt -r requirements-dev.txt
-          python -m pytest -q
+          python -m pytest -q -rs
 
       # Las dependencias van dentro del paquete: sin esto la Function no puede importar function_app.py
       - name: Install dependencies into the package
         run: pip install -r requirements.txt --target=".python_packages/lib/site-packages"
 
       - name: Zip artifact for deployment
-        run: zip release.zip function_app.py host.json requirements.txt -r src .python_packages
+        run: zip release.zip function_app.py host.json requirements.txt -r src .python_packages -x "*__pycache__*"
 
       - name: Upload artifact for deployment job
         uses: actions/upload-artifact@v4

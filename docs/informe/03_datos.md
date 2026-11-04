@@ -1,6 +1,6 @@
 # 3. Datos
 
-> Borrador de la fase 0 (3-nov-2026). Se completa en la fase 2 con la limpieza. Lo marcado con [FUENTE] necesita una cita externa.
+> Borrador de las fases 0 (3-nov-2026) y 2 (4-nov-2026). Lo marcado con [FUENTE] necesita una cita externa.
 
 ## 3.1 Fuente principal: Excel de posiciones cortas netas de la CNMV
 
@@ -18,9 +18,37 @@
 
 El volumen es pequeño: el reto no es el tamaño, sino la ejecución diaria desatendida, la calidad del dato y la separación entre clientes.
 
-## 3.2 Calidad del dato
+## 3.2 Limpieza y capa silver
 
-Se ha comprobado que la serie diaria reconstruida a partir del historial reproduce exactamente las posiciones vigentes que publica la CNMV en 31 de 38 ISIN. Las 7 diferencias son ISIN antiguos tras operaciones corporativas o posiciones cerradas sin notificación de cierre. Los problemas detectados y su tratamiento están en `docs/fase0/hallazgos_datos.md`.
+Cada vez que llega un fichero nuevo, la plataforma lo convierte en cinco tablas limpias en Parquet: la capa *silver*, que ocupa unos 0,5 MB. Con el fichero del 3-nov-2026 la reconstrucción **cuadra al 100 % con las posiciones vigentes que publica la CNMV (30 de 30 emisores)**. El proceso tarda menos de un segundo.
+
+| Tabla | Una fila por… | Filas (3-nov-2026) |
+| --- | --- | --- |
+| `notificaciones` | notificación única: fondo, emisor, fecha y % | 12.370 |
+| `emisores` | empresa (LEI), con sus ISIN y su nombre más reciente | 80 |
+| `fondos` | entidad notificante, con su grupo gestor | 229 (199 grupos) |
+| `posiciones_intervalos` | tramo en que un fondo mantiene el mismo % público sobre un emisor | 11.594 |
+| `posiciones_diarias` | fondo, emisor y día hábil con posición pública | 331.157 |
+
+**Reglas de limpieza:**
+- **Duplicados.** Las hojas Serie y Anteriores repiten filas, y la de vigentes repite las de Serie. Se quedan las filas únicas y se eliminan 2.385.
+- **ISIN** en mayúsculas: el fichero mezcla `ES…`, `es…` y `Es…`.
+- **Agrupación por emisor (LEI), no por ISIN.** La posición corta neta se calcula sobre el capital del emisor, y los ISIN cambian tras operaciones corporativas: contrasplits, derechos de suscripción, clases de acciones. Agrupar por LEI elimina las 7 discrepancias que daba agrupar por ISIN en la fase 0.
+- **Conflictos.** Si un mismo fondo notifica dos porcentajes sobre el mismo emisor el mismo día (por ejemplo, en dos ISIN), se toma el mayor y se cuenta como incidencia. Hasta ahora: 0.
+- **Serie diaria.** Cada notificación vale hasta la siguiente del mismo fondo y emisor. Por debajo del 0,5 % la posición deja de ser pública y cuenta como cerrada. Se expande a días hábiles.
+- **Cierres sin aviso.** Si una posición ya no está vigente y su última notificación es ≥ 0,5 %, se da por cerrada ese mismo día y se marca como *cierre inferido*. Con la agrupación por LEI hay 0 casos.
+- **Dos fechas.** Cada notificación guarda la fecha de la posición y la de la primera captura en la que apareció. El histórico cargado el primer día no tiene fecha de captura, porque no se puede saber cuándo se publicó cada fila. Desde entonces, cada notificación nueva queda fechada; por ejemplo, el 3-nov-2026 llegaron 13.
+
+**Hallazgo: la hoja de vigentes de la CNMV no son solo posiciones vivas.** Muestra durante un día las posiciones que acaban de bajar del 0,5 %. El 3-nov-2026, AQR en Ferrovial y BlackRock en Aena aparecían con un 0,49 %. El cuadre solo compara las posiciones ≥ 0,5 %.
+
+**Grupos gestores.** La CNMV identifica a la entidad legal que notifica (por ejemplo, *Citadel Advisors LLC* o *Citadel Europe LLP*). A una cotizada le interesa la casa que hay detrás. Una tabla revisada a mano (`src/limpieza/grupos_gestores.csv`) asigna 52 entidades a 22 grupos con varias entidades; por ejemplo, Man Group reúne GLG, AHL y Man Investments. Ante la duda, no se une: *Polar Capital* y *Polar Asset Management Partners* son gestoras distintas, y *Citadel Securities* es una empresa distinta del fondo *Citadel*.
+
+**Controles de calidad.** En cada ejecución se comprueban:
+- duplicados y conflictos;
+- LEI con formato inválido, ISIN inválidos, porcentajes fuera de 0–100 % y fechas fuera de rango;
+- el cuadre con la hoja de vigentes.
+
+Si falla algún control crítico (LEI, porcentajes, fechas o cuadre), la silver no se sobrescribe, el informe se guarda aparte (`calidad_rechazada.json`) y salta la alerta por correo.
 
 ## 3.3 Fuentes complementarias
 

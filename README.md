@@ -9,10 +9,10 @@ Proyecto final · Track B (Arquitectura técnica) · Entrega: 10-ene-2027. Plann
 | Carpeta | Contenido |
 | --- | --- |
 | `data/raw/` | Ficheros originales de la CNMV (bronze). No se versionan |
-| `data/processed/` | Datos limpios (silver) en local. No se versionan |
+| `data/silver/` | Tablas limpias (silver) en local, en Parquet. No se versionan |
 | `scripts/` | Análisis puntuales, como la validación de la fase 0 |
 | `src/ingesta/` | Descarga, validación y guardado del Excel en bronze (fase 1) |
-| `src/limpieza/` | Limpieza y serie diaria (fase 2) |
+| `src/limpieza/` | Limpieza, grupos gestores y posiciones diarias: capa silver (fase 2) |
 | `src/modelo/` | Modelo en estrella y carga en SQL (fase 3) |
 | `src/alertas/` | Indicadores y reglas de alerta (fase 4) |
 | `function_app.py`, `host.json` | Azure Function que lanza la ingesta (la raíz del repo es la app) |
@@ -29,6 +29,7 @@ Proyecto final · Track B (Arquitectura técnica) · Entrega: 10-ene-2027. Plann
 python -m venv .venv
 .venv/Scripts/pip install -r requirements.txt -r requirements-dev.txt
 .venv/Scripts/python -m src.ingesta.ejecutar     # descarga y guarda en data/raw/cnmv/...
+.venv/Scripts/python -m src.limpieza.silver      # construye las tablas limpias en data/silver/cnmv/
 .venv/Scripts/python -m pytest                   # pruebas
 ```
 

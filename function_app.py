@@ -11,6 +11,7 @@ import azure.functions as func
 
 from src.ingesta.almacen import AlmacenBlob
 from src.ingesta.ejecutar import ErrorIngesta, ingestar
+from src.limpieza import silver
 
 app = func.FunctionApp()
 # El SDK de Azure registra cada cabecera HTTP a nivel INFO: ruido y coste en Application Insights
@@ -19,8 +20,14 @@ logging.getLogger("azure").setLevel(logging.WARNING)
 
 @app.timer_trigger(schedule="%CRON_INGESTA%", arg_name="temporizador", run_on_startup=False, use_monitor=True)
 def ingesta_cnmv(temporizador: func.TimerRequest) -> None:
+    bronze = AlmacenBlob.desde_entorno("bronze")
+    silver_almacen = AlmacenBlob.desde_entorno("silver")
     try:
-        resultado = ingestar(AlmacenBlob.desde_entorno())
+        resultado = ingestar(bronze)
+        # La silver se rehace solo cuando llega un fichero nuevo (o si aún no existe)
+        if resultado["estado"] == "nuevo" or silver_almacen.leer_texto(f"{silver.PREFIJO}/calidad.json") is None:
+            calidad = silver.ejecutar(bronze, silver_almacen)
+            logging.info("SILVER_CNMV_OK %s", json.dumps(calidad, ensure_ascii=False, default=str))
     except ErrorIngesta as e:
         # El prefijo INGESTA_CNMV_FALLO es el que vigila la alerta de Application Insights
         logging.error("INGESTA_CNMV_FALLO %s: %s", type(e).__name__, e)

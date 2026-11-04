@@ -1,18 +1,14 @@
 import json
-from datetime import datetime, timezone
-from pathlib import Path
+from datetime import datetime, time, timedelta, timezone
 
 import pytest
 
 from src.ingesta import cnmv
 from src.ingesta.almacen import AlmacenLocal
 from src.ingesta.ejecutar import RUTA_ESTADO, ErrorFormato, ingestar
+from tests.conftest import EXCEL, requiere_excel
 
-RAW = Path(__file__).parents[1] / "data" / "raw"
-EXCEL = RAW / "NetShortPositions_2026-11-02.xls"
-pytestmark = pytest.mark.skipif(not EXCEL.exists(), reason="falta el Excel de la CNMV en data/raw")
-
-AHORA = datetime(2026, 11, 3, 15, 0, tzinfo=timezone.utc)
+pytestmark = requiere_excel
 
 
 @pytest.fixture(scope="module")
@@ -23,6 +19,12 @@ def contenido():
 @pytest.fixture(scope="module")
 def libro(contenido):
     return cnmv.abrir(contenido)
+
+
+@pytest.fixture(scope="module")
+def ahora(libro):
+    """El día siguiente a la publicación, a las 15:00 UTC."""
+    return datetime.combine(cnmv.fecha_publicacion(libro) + timedelta(days=1), time(15), timezone.utc)
 
 
 class LibroFalso:
@@ -55,7 +57,7 @@ class HojaFalsa:
 
 def test_fichero_real_es_valido(libro):
     assert cnmv.validar(libro) == []
-    assert cnmv.fecha_publicacion(libro).isoformat() == "2026-11-02"
+    assert cnmv.fecha_publicacion(libro).year >= 2026
 
 
 def test_hash_de_contenido_ignora_metadatos(contenido, libro):
@@ -87,29 +89,33 @@ def test_detecta_porcentaje_y_fecha_invalidos(libro):
     assert "2 filas" in problema
 
 
-def test_primera_captura_guarda_y_la_segunda_no(tmp_path, contenido):
+def test_primera_captura_guarda_y_la_segunda_no(tmp_path, contenido, libro, ahora):
     almacen = AlmacenLocal(tmp_path)
-    r1 = ingestar(almacen, contenido=contenido, cabeceras={}, ahora=AHORA)
+    r1 = ingestar(almacen, contenido=contenido, cabeceras={}, ahora=ahora)
     assert r1["estado"] == "nuevo"
     guardado = tmp_path / r1["ruta"]
     assert guardado.read_bytes() == contenido  # bronze: el fichero sin tocar
-    assert "fecha_publicacion=2026-11-02" in r1["ruta"]
+    assert f"fecha_publicacion={cnmv.fecha_publicacion(libro)}" in r1["ruta"]
     assert json.loads((tmp_path / RUTA_ESTADO).read_text())["hash_contenido"] == r1["hash_contenido"]
 
-    r2 = ingestar(almacen, contenido=contenido, cabeceras={}, ahora=AHORA.replace(hour=16))
+    r2 = ingestar(almacen, contenido=contenido, cabeceras={}, ahora=ahora.replace(hour=16))
     assert r2["estado"] == "sin_cambios"
     assert len(list(tmp_path.rglob("*.xls"))) == 1
 
 
-def test_formato_invalido_se_guarda_en_rechazados_y_avisa(tmp_path):
+def test_formato_invalido_se_guarda_en_rechazados_y_avisa(tmp_path, ahora):
     with pytest.raises(ErrorFormato):
-        ingestar(AlmacenLocal(tmp_path), contenido=b"<html></html>", cabeceras={}, ahora=AHORA)
+        ingestar(AlmacenLocal(tmp_path), contenido=b"<html></html>", cabeceras={}, ahora=ahora)
     assert len(list((tmp_path / "cnmv/net_short_positions/rechazados").glob("*.xls"))) == 1
     assert not (tmp_path / RUTA_ESTADO).exists()
 
 
-def test_avisa_si_la_cnmv_deja_de_publicar(tmp_path, contenido):
-    lunes_siguiente = datetime(2026, 11, 9, 15, 0, tzinfo=timezone.utc)
-    r = ingestar(AlmacenLocal(tmp_path), contenido=contenido, cabeceras={}, ahora=lunes_siguiente)
-    assert "aviso" in r and r["dias_sin_publicar"] == 7
-    assert "aviso" not in ingestar(AlmacenLocal(tmp_path / "b"), contenido=contenido, cabeceras={}, ahora=AHORA)
+def test_avisa_si_la_cnmv_deja_de_publicar(tmp_path, contenido, libro, ahora):
+    publicado = cnmv.fecha_publicacion(libro)
+    dia_habil = publicado + timedelta(days=7)
+    while dia_habil.weekday() >= 5:
+        dia_habil += timedelta(days=1)
+    tarde = datetime.combine(dia_habil, time(15), timezone.utc)
+    r = ingestar(AlmacenLocal(tmp_path), contenido=contenido, cabeceras={}, ahora=tarde)
+    assert "aviso" in r and r["dias_sin_publicar"] == (dia_habil - publicado).days
+    assert "aviso" not in ingestar(AlmacenLocal(tmp_path / "b"), contenido=contenido, cabeceras={}, ahora=ahora)
