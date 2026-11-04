@@ -24,10 +24,12 @@ def ingesta_cnmv(temporizador: func.TimerRequest) -> None:
     silver_almacen = AlmacenBlob.desde_entorno("silver")
     try:
         resultado = ingestar(bronze)
-        # La silver se rehace si no corresponde al último fichero de bronze: llega uno nuevo,
-        # aún no existe o la última construcción falló (se reintenta cada hora)
+        # La silver se rehace si no corresponde al último fichero de bronze o a las reglas actuales:
+        # llega un fichero nuevo, aún no existe, la última construcción falló (se reintenta cada hora)
+        # o se ha desplegado una versión nueva de las reglas de limpieza
         calidad_previa = json.loads(silver_almacen.leer_texto(f"{silver.PREFIJO}/calidad.json") or "{}")
-        if calidad_previa.get("origen_bronze") != resultado["ruta"]:
+        if (calidad_previa.get("origen_bronze"), calidad_previa.get("version_reglas")) != (
+                resultado["ruta"], silver.VERSION_REGLAS):
             calidad = silver.ejecutar(bronze, silver_almacen)
             logging.info("SILVER_CNMV_OK %s", json.dumps(calidad, ensure_ascii=False, default=str))
     except ErrorIngesta as e:

@@ -5,8 +5,9 @@ Reglas (documentadas en docs/informe/03_datos.md):
   así se absorben los cambios de ISIN tras operaciones corporativas.
 - Cada notificación vale hasta la siguiente del mismo fondo y emisor. Por debajo del
   0,5 % la posición deja de ser pública y se trata como cerrada.
-- Una posición que ya no está en la hoja de vigentes y cuya última notificación es
-  >= 0,5 % se cierra el día de esa notificación (cierre inferido: falta el aviso de cierre).
+- La CNMV no publica la mayoría de los avisos de cierre. Una posición que no sigue vigente
+  y pasa más de CADUCIDAD_DIAS sin ningún aviso se da por cerrada CADUCIDAD_DIAS después del
+  último (cierre inferido). El 99 % de los cierres publicados llega antes de 301 días.
 """
 import io
 import json
@@ -19,7 +20,10 @@ import pandas as pd
 from src.ingesta import cnmv
 
 PREFIJO = "cnmv"
+# Cambiarla obliga a reconstruir la silver en Azure aunque no llegue un fichero nuevo
+VERSION_REGLAS = "2026-11-04 caducidad-365"
 UMBRAL = 0.5
+CADUCIDAD_DIAS = 365
 FECHA_MINIMA = pd.Timestamp("2010-01-01")
 CLAVE = ["lei", "tenedor", "fecha_posicion"]
 TABLAS = ["notificaciones", "emisores", "fondos", "posiciones_intervalos", "posiciones_diarias"]
@@ -88,10 +92,13 @@ def intervalos(notif, vigentes, fecha_publicacion):
     df["hasta"] = siguiente - pd.Timedelta(days=1)
     es_ultima = siguiente.isna()
     sigue_viva = pd.Series([(l, t) in vigentes for l, t in zip(df["lei"], df["tenedor"])], index=df.index)
-    df.loc[es_ultima & sigue_viva, "hasta"] = pd.Timestamp(fecha_publicacion)
-    df.loc[es_ultima & ~sigue_viva, "hasta"] = df["desde"]
-    df["cierre_inferido"] = es_ultima & ~sigue_viva & (df["pct"] >= UMBRAL)
     df["vigente"] = es_ultima & sigue_viva
+    df.loc[es_ultima, "hasta"] = pd.Timestamp(fecha_publicacion)
+    # Sin aviso de cierre: como mucho CADUCIDAD_DIAS tras el último aviso (salvo que siga vigente)
+    limite = df["desde"] + pd.Timedelta(days=CADUCIDAD_DIAS)
+    caduca = ~df["vigente"] & (df["hasta"] > limite)
+    df.loc[caduca, "hasta"] = limite[caduca]
+    df["cierre_inferido"] = caduca & (df["pct"] >= UMBRAL)
     return df[df["pct"] >= UMBRAL].drop(columns="fecha_posicion").reset_index(drop=True)
 
 
@@ -185,6 +192,7 @@ def ejecutar(almacen_bronze, almacen_silver, captura_utc=None):
     tablas, informe = construir(libro, date.fromisoformat(estado["fecha_publicacion"]),
                                 captura_utc or estado["captura_utc"], previas)
     informe["origen_bronze"] = estado["ruta"]
+    informe["version_reglas"] = VERSION_REGLAS
     if informe["criticos"]:
         rechazo = f"{PREFIJO}/rechazos/calidad_{estado['fecha_publicacion']}_{Path(estado['ruta']).stem}.json"
         almacen_silver.escribir_texto(rechazo, json.dumps(informe, indent=2, default=str))

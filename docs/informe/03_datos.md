@@ -28,7 +28,7 @@ Cada vez que llega un fichero nuevo, la plataforma lo convierte en cinco tablas 
 | `emisores` | empresa (LEI), con sus ISIN y su nombre más reciente | 80 |
 | `fondos` | entidad notificante, con su grupo gestor | 229 (199 grupos) |
 | `posiciones_intervalos` | tramo en que un fondo mantiene el mismo % público sobre un emisor | 11.594 |
-| `posiciones_diarias` | fondo, emisor y día hábil con posición pública | 331.157 |
+| `posiciones_diarias` | fondo, emisor y día hábil con posición pública | 219.925 |
 
 **Reglas de limpieza:**
 - **Duplicados.** Las hojas Serie y Anteriores repiten filas, y la de vigentes repite las de Serie. Se quedan las filas únicas y se eliminan 2.385.
@@ -36,7 +36,7 @@ Cada vez que llega un fichero nuevo, la plataforma lo convierte en cinco tablas 
 - **Agrupación por emisor (LEI), no por ISIN.** La posición corta neta se calcula sobre el capital del emisor, y los ISIN cambian tras operaciones corporativas: contrasplits, derechos de suscripción, clases de acciones. Agrupar por LEI elimina las 7 discrepancias que daba agrupar por ISIN en la fase 0.
 - **Conflictos.** Si un mismo fondo notifica dos porcentajes sobre el mismo emisor el mismo día (por ejemplo, en dos ISIN), se toma el mayor y se cuenta como incidencia. Hasta ahora: 0.
 - **Serie diaria.** Cada notificación vale hasta la siguiente del mismo fondo y emisor. Por debajo del 0,5 % la posición deja de ser pública y cuenta como cerrada. Se expande a días hábiles.
-- **Cierres sin aviso.** Si una posición ya no está vigente y su última notificación es ≥ 0,5 %, se da por cerrada ese mismo día y se marca como *cierre inferido*. Con la agrupación por LEI hay 0 casos.
+- **Cierres sin aviso (caducidad de 365 días).** La CNMV no publica la mayoría de los avisos de cierre: en todo el fichero solo hay 774, frente a más de 11.000 tramos. Si se dejara cada aviso vivo hasta el siguiente, posiciones casi seguro cerradas seguirían abiertas durante años; por ejemplo, JPMorgan aparecería con un 0,599 % en Rovi de 2011 a 2025. Esos tramos sumaban la mitad de la serie diaria. Por eso, una posición que no sigue vigente y pasa más de 365 días sin ningún aviso se da por cerrada 365 días después del último y se marca como *cierre inferido* (204 tramos). El límite se basa en los datos: el 99 % de los cierres publicados llega antes de 301 días, y la posición viva más antigua lleva 578 días sin avisos. A las posiciones vigentes no se les aplica.
 - **Dos fechas.** Cada notificación guarda la fecha de la posición y la de la primera captura en la que apareció. El histórico cargado el primer día no tiene fecha de captura, porque no se puede saber cuándo se publicó cada fila. Desde entonces, cada notificación nueva queda fechada; por ejemplo, el 3-nov-2026 llegaron 13.
 
 **Hallazgo: la hoja de vigentes de la CNMV no son solo posiciones vivas.** Muestra durante un día las posiciones que acaban de bajar del 0,5 %. El 3-nov-2026, AQR en Ferrovial y BlackRock en Aena aparecían con un 0,49 %. El cuadre solo compara las posiciones ≥ 0,5 %.
@@ -65,6 +65,6 @@ He leído entera la Nota legal de la CNMV (consultada el 3-nov-2026; copia liter
 
 - **Umbral del 0,5 %:** las posiciones entre el 0,1 % y el 0,5 % no se publican, así que la presión bajista real es mayor que la visible. Un fondo puede estar presente sin aparecer.
 - **Retraso de un día:** se publica la posición del día hábil anterior.
-- **Huecos en el historial:** algunos fondos repiten el mismo 0,50 % con años de diferencia y sin registros intermedios (por ejemplo, AQR en Grifols entre 2018 y 2024). No se puede saber si la posición siguió viva.
+- **Cierres no publicados:** la CNMV no publica la mayoría de las bajadas por debajo del 0,5 %. La regla de caducidad de 365 días corrige los huecos largos, pero no los cortos: una posición cerrada sin aviso que reaparece antes de un año se cuenta como viva todo ese tiempo. Por eso las sumas históricas son una cota superior de la presión bajista publicada.
 - **Cambios de ISIN:** 9 emisores tienen varios ISIN por operaciones corporativas; el análisis se hace por emisor (LEI).
 - **Formato:** el fichero es un Excel antiguo con fechas como texto y tres filas vacías arriba. Un cambio de formato rompería la lectura, por eso la ingesta tiene que detectarlo.

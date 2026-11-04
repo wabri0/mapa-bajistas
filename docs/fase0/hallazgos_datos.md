@@ -44,6 +44,8 @@ Comprobación: la reconstrucción a la última fecha debe dar la hoja de Vigente
 
 ## 4. Caso Grifols (clase A, `ES0171996087`)
 
+> **Corrección de la fase 2 (4-nov-2026):** las cifras de esta sección y de la 5 dejan cada aviso vivo hasta el siguiente. En la fase 2 se vio que la CNMV no publica la mayoría de los cierres, y se aplicó una caducidad de 365 días (ver `docs/informe/03_datos.md`). Con esa regla, Grifols pasa de una media de 2,09 % a 1,59 % antes del informe y de un máximo de 4,38 % a 3,88 % (14-mar-2024, 5 fondos). Solaria pasa de un máximo de 16,57 % a 16,06 % y de 19 a 18 fondos. Las conclusiones no cambian.
+
 214 notificaciones desde 2010 y 17 fondos distintos. Hoy solo queda una posición viva: Kintbury Capital, 1,78 % (29-oct-2026).
 
 | Fecha | Suma publicada | Fondos | Qué pasa |

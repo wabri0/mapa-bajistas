@@ -1,6 +1,6 @@
 # 2. Contexto y problema
 
-> Borrador de la fase 0 (3-nov-2026). Las cifras salen de `scripts/fase0_explorar.py`. Lo marcado con [FUENTE] necesita una cita externa antes de la entrega.
+> Borrador de la fase 0 (3-nov-2026), con cifras actualizadas en la fase 2 (4-nov-2026) tras aplicar la regla de caducidad de 365 días. Las cifras salen de la capa silver (`data/silver/cnmv/posiciones_diarias.parquet`). Lo marcado con [FUENTE] necesita una cita externa antes de la entrega.
 
 ## 2.1 Qué es una posición corta neta
 
@@ -16,16 +16,16 @@ El Reglamento (UE) 236/2012 sobre ventas en corto obliga a comunicarlas al super
 
 El 9 de enero de 2024, Gotham City Research publicó un informe muy crítico con las cuentas de Grifols [FUENTE: fecha y caída de la cotización]. Los datos de la CNMV muestran cómo reaccionaron los fondos bajistas:
 
-- **Antes del informe**, la presión bajista era estable: de media, 2,09 % del capital entre septiembre y diciembre de 2023, repartido entre 4 fondos.
+- **Antes del informe**, la presión bajista era estable: de media, 1,59 % del capital entre septiembre y diciembre de 2023, repartido entre 3 fondos.
 - **El mismo 9 de enero**, un fondo que había abierto un 0,57 % el día anterior (General Industrial Partners) lo redujo al 0,06 %.
-- **En las semanas siguientes**, la presión creció. Qube Research & Technologies pasó del 0,50 % al 1,66 %, y entraron o volvieron WorldQuant, AKO Capital y Marshall Wace. La suma publicada llegó a un **máximo del 4,38 % con 6 fondos el 14 de marzo de 2024**, el doble que antes de la crisis.
-- A finales de marzo, Qube cerró y la suma volvió al 2,4 % en mayo.
+- **En las semanas siguientes**, la presión creció. Qube Research & Technologies pasó del 0,50 % al 1,66 %, y entraron o volvieron WorldQuant, AKO Capital y Marshall Wace. La suma publicada llegó a un **máximo del 3,88 % con 5 fondos el 14 de marzo de 2024**, más del doble que antes de la crisis.
+- A finales de marzo, Qube cerró y la suma volvió al 1,9 % en mayo.
 
 Lo que enseña el caso: las posiciones públicas no anticiparon el ataque, pero sí mostraron, día a día, quién aprovechaba la crisis, con cuánto y cuándo salía. Esa es la información que necesita el equipo de relación con inversores para responder.
 
 ## 2.3 Un patrón distinto: Solaria
 
-Solaria muestra el caso opuesto: una presión bajista persistente durante años. Desde la primera notificación en junio de 2018 han tomado posiciones cortas sobre ella 42 fondos distintos. La suma publicada llegó al **16,57 % del capital el 19 de diciembre de 2024**, y el **12 de diciembre de 2024** había **19 fondos** a la vez. Hoy (30-oct-2026) sigue siendo la cotizada española con más posiciones cortas: **8,13 % entre 8 fondos**, casi el doble que la segunda (Enagás, 4,21 %).
+Solaria muestra el caso opuesto: una presión bajista persistente durante años. Desde la primera notificación en junio de 2018 han tomado posiciones cortas sobre ella 42 fondos distintos. La suma publicada llegó al **16,06 % del capital el 19 de diciembre de 2024**, y el **12 de diciembre de 2024** había **18 fondos** a la vez. Hoy (30-oct-2026) sigue siendo la cotizada española con más posiciones cortas: **8,13 % entre 8 fondos**, casi el doble que la segunda (Enagás, 4,21 %).
 
 ## 2.4 Cómo se trabaja hoy
 

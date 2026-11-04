@@ -59,9 +59,27 @@ def test_una_posicion_vigente_llega_hasta_la_fecha_de_publicacion():
     assert tramos.loc[0, "hasta"] == pd.Timestamp(PUBLICACION) and tramos.loc[0, "vigente"]
 
 
-def test_sin_aviso_de_cierre_se_cierra_el_dia_de_la_ultima_notificacion():
+def test_sin_aviso_de_cierre_caduca_a_los_365_dias():
+    tramos, _ = tramos_de(filas(
+        (ANT, LEI_A, "ES0000000001", "Fondo X", "2018-08-15", 0.6),   # nada durante 6 años
+        (ANT, LEI_A, "ES0000000001", "Fondo X", "2024-08-14", 0.5),   # posición nueva
+        (ANT, LEI_A, "ES0000000001", "Fondo X", "2024-09-02", 0.4),
+    ))
+    assert tramos.loc[0, "hasta"] == pd.Timestamp("2019-08-15") and tramos.loc[0, "cierre_inferido"]
+    assert tramos.loc[1, "hasta"] == pd.Timestamp("2024-09-01") and not tramos.loc[1, "cierre_inferido"]
+
+
+def test_una_posicion_que_ya_no_esta_vigente_tambien_caduca():
     tramos, _ = tramos_de(filas((ANT, LEI_A, "ES0000000001", "Fondo X", "2018-08-15", 0.6)))
-    assert tramos.loc[0, "hasta"] == tramos.loc[0, "desde"] and tramos.loc[0, "cierre_inferido"]
+    assert tramos.loc[0, "hasta"] == pd.Timestamp("2019-08-15") and tramos.loc[0, "cierre_inferido"]
+
+
+def test_una_posicion_vigente_no_caduca_aunque_sea_antigua():
+    tramos, _ = tramos_de(filas(
+        (VIG, LEI_A, "ES0000000001", "Fondo X", "2025-04-04", 0.6),
+        (SERIE, LEI_A, "ES0000000001", "Fondo X", "2025-04-04", 0.6),
+    ))
+    assert tramos.loc[0, "hasta"] == pd.Timestamp(PUBLICACION) and not tramos.loc[0, "cierre_inferido"]
 
 
 def test_un_cambio_de_isin_no_rompe_la_serie_porque_se_agrupa_por_lei():
@@ -141,11 +159,11 @@ def test_fichero_real_cuadra_con_la_cnmv_y_se_guarda(tmp_path):
     diarias = pd.read_parquet(tmp_path / "silver" / "cnmv" / "posiciones_diarias.parquet")
     assert diarias["fecha"].dt.day_of_week.max() <= 4
 
-    # Caso Grifols de la fase 0: máximo de 4,38 % el 14-mar-2024
+    # Caso Grifols (con caducidad de 365 días): máximo de 3,88 % el 14-mar-2024
     emisores = pd.read_parquet(tmp_path / "silver" / "cnmv" / "emisores.parquet")
     lei = emisores.loc[emisores["emisor"].str.contains("GRIFOLS"), "lei"].iloc[0]
     suma = diarias[(diarias["lei"] == lei) & diarias["fecha"].between("2024-01-01", "2024-06-30")].groupby("fecha")["pct"].sum()
-    assert round(suma.max(), 2) == 4.38 and suma.idxmax() == pd.Timestamp("2024-03-14")
+    assert round(suma.max(), 2) == 3.88 and suma.idxmax() == pd.Timestamp("2024-03-14")
 
 
 @requiere_excel
