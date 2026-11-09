@@ -65,12 +65,13 @@ BEGIN
     WHEN MATCHED THEN
         UPDATE SET nombre = s.nombre, isins = s.isins, ticker = s.ticker, tiene_precios = s.tiene_precios,
                    primera_notificacion = s.primera_notificacion, ultima_notificacion = s.ultima_notificacion,
-                   notificaciones = s.notificaciones, acciones_circulacion = s.acciones_circulacion
+                   notificaciones = s.notificaciones, acciones_circulacion = s.acciones_circulacion,
+                   nombre_corto = s.nombre_corto
     WHEN NOT MATCHED BY TARGET THEN
         INSERT (lei, nombre, isins, ticker, tiene_precios, primera_notificacion, ultima_notificacion, notificaciones,
-                acciones_circulacion)
+                acciones_circulacion, nombre_corto)
         VALUES (s.lei, s.nombre, s.isins, s.ticker, s.tiene_precios, s.primera_notificacion,
-                s.ultima_notificacion, s.notificaciones, s.acciones_circulacion);
+                s.ultima_notificacion, s.notificaciones, s.acciones_circulacion, s.nombre_corto);
 
     MERGE dw.dim_fondo AS d
     USING stg.dim_fondo AS s ON d.tenedor = s.tenedor

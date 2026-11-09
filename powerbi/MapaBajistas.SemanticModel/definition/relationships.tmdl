@@ -1,0 +1,75 @@
+relationship cabd2c56-a006-5fb2-946b-9d216d10b2de
+	fromColumn: fact_posicion_diaria.emisor_id
+	toColumn: dim_emisor.emisor_id
+
+relationship 514240fb-9fa6-58f9-b0b8-9baffa009322
+	fromColumn: fact_posicion_diaria.fecha_id
+	toColumn: dim_fecha.fecha_id
+
+relationship d846a58e-18b6-55bf-b76b-04b4b6bcfa63
+	fromColumn: fact_posicion_diaria.fondo_id
+	toColumn: dim_fondo.fondo_id
+
+relationship ded0311f-813d-5658-a5df-ee6363cbd540
+	fromColumn: fact_precio_diario.emisor_id
+	toColumn: dim_emisor.emisor_id
+
+relationship 944302f9-7df5-5b09-aacc-d186eaf44c2e
+	fromColumn: fact_precio_diario.fecha_id
+	toColumn: dim_fecha.fecha_id
+
+relationship c86fa3d6-f19f-5d20-b38a-d2ef1e61faa0
+	fromColumn: fact_indicador_diario.emisor_id
+	toColumn: dim_emisor.emisor_id
+
+relationship 4ba78d3d-1181-54f5-8b03-b3dc7bcccaa8
+	fromColumn: fact_indicador_diario.fecha_id
+	toColumn: dim_fecha.fecha_id
+
+relationship 20b2d238-638a-5041-898a-cb2c9e2bfb38
+	fromColumn: fact_notificacion.emisor_id
+	toColumn: dim_emisor.emisor_id
+
+relationship 07d079cd-d073-5e84-b5ef-785b00ea915b
+	fromColumn: fact_notificacion.fecha_id
+	toColumn: dim_fecha.fecha_id
+
+relationship 20604f39-e27d-5bb8-be93-1d519b627c61
+	fromColumn: fact_notificacion.fondo_id
+	toColumn: dim_fondo.fondo_id
+
+relationship bea089c0-93a7-56ef-98f8-34b98677ddae
+	fromColumn: cliente_emisor.cliente_id
+	toColumn: dim_cliente.cliente_id
+
+relationship f1899038-5fee-5660-819a-aa3140c82c5b
+	fromColumn: cliente_emisor.emisor_id
+	toColumn: dim_emisor.emisor_id
+
+relationship 0ebbc8fb-e226-5480-81c8-2d039422810a
+	fromColumn: alerta.cliente_id
+	toColumn: dim_cliente.cliente_id
+
+relationship b41f5c82-3bf4-5371-8d70-a32eb37a9eda
+	fromColumn: alerta.emisor_id
+	toColumn: dim_emisor.emisor_id
+
+relationship 07ac0111-5dcd-5fb7-8b4d-a5e36910a395
+	fromColumn: alerta.fecha_id
+	toColumn: dim_fecha.fecha_id
+
+relationship f6d6b20c-49c1-5b68-9ff2-76ded827110e
+	fromColumn: nota.cliente_id
+	toColumn: dim_cliente.cliente_id
+
+relationship 4b594425-5c6c-5e57-9a21-1091a9925811
+	fromColumn: nota.emisor_id
+	toColumn: dim_emisor.emisor_id
+
+relationship fba84ebf-9a8d-5aea-aa42-5effadfbf444
+	fromColumn: nota.fecha_id
+	toColumn: dim_fecha.fecha_id
+
+relationship 8752fc79-21c2-5f39-bfe7-c9a57f969271
+	fromColumn: regla_alerta.cliente_id
+	toColumn: dim_cliente.cliente_id

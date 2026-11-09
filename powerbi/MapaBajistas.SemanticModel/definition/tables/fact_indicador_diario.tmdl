@@ -1,0 +1,148 @@
+table fact_indicador_diario
+	lineageTag: d2180c0f-d8b7-508c-8986-a173a2723c4e
+
+	measure 'Cortas %' = AVERAGEX(VALUES(dim_fecha[fecha_id]), CALCULATE(SUM(fact_indicador_diario[suma_pct])))
+		formatString: 0.00
+		lineageTag: 65d7f25d-7a15-5394-b313-b2ebf2b1f4c0
+
+	measure 'Cortas máx %' = MAXX(VALUES(dim_fecha[fecha_id]), CALCULATE(SUM(fact_indicador_diario[suma_pct])))
+		formatString: 0.00
+		lineageTag: 41ff38c4-7b46-51de-a5f8-a828e1522169
+
+	measure 'Fondos con posición' = AVERAGEX(VALUES(dim_fecha[fecha_id]), CALCULATE(SUM(fact_indicador_diario[num_fondos])))
+		formatString: 0.0
+		lineageTag: 8d4f919a-641a-5e5d-a6ca-e61cfed31f3b
+
+	measure 'Días para cubrir' = AVERAGE(fact_indicador_diario[dias_cubrir])
+		formatString: 0.0
+		lineageTag: 604f5392-41e1-5a9c-9ffa-8b1fdf45cdc7
+
+	measure 'Color calor' = VAR v = [Cortas %] RETURN SWITCH(TRUE(), ISBLANK(v), BLANK(), v >= 10, "#7F1D1D", v >= 5, "#B91C1C", v >= 3, "#DC2626", v >= 2, "#F87171", v >= 1, "#FCA5A5", v > 0, "#FEE2E2", "#FFFFFF")
+		isHidden
+		lineageTag: 60fc4328-b093-5fdc-95e3-0ea386715ee2
+
+	measure 'Color texto calor' = IF([Cortas %] >= 3, "#FFFFFF", "#15212C")
+		isHidden
+		lineageTag: 6eae2ee4-07df-5791-8cc2-bb5e3a51e7ec
+
+	column emisor_id
+		dataType: int64
+		formatString: 0
+		isHidden
+		lineageTag: 555cad50-20f9-5b9a-8cae-10e3caebc81a
+		summarizeBy: none
+		sourceColumn: emisor_id
+
+		annotation SummarizationSetBy = Automatic
+
+	column fecha_id
+		dataType: int64
+		formatString: 0
+		isHidden
+		lineageTag: 62710e3e-52a1-540a-9044-a2d1021fce35
+		summarizeBy: none
+		sourceColumn: fecha_id
+
+		annotation SummarizationSetBy = Automatic
+
+	column suma_pct
+		dataType: double
+		formatString: 0.00
+		isHidden
+		lineageTag: 43deee56-81e8-501e-b5ca-556ce4488e6a
+		summarizeBy: none
+		sourceColumn: suma_pct
+
+		annotation SummarizationSetBy = Automatic
+
+	column num_fondos
+		dataType: int64
+		formatString: 0
+		isHidden
+		lineageTag: 62f81d52-ca66-55a1-956b-bca83b760de9
+		summarizeBy: none
+		sourceColumn: num_fondos
+
+		annotation SummarizationSetBy = Automatic
+
+	column fondos_nuevos
+		dataType: int64
+		formatString: 0
+		isHidden
+		lineageTag: d020010a-53f4-5a21-a750-7a4cd92a07e2
+		summarizeBy: none
+		sourceColumn: fondos_nuevos
+
+		annotation SummarizationSetBy = Automatic
+
+	column salidas
+		dataType: int64
+		formatString: 0
+		isHidden
+		lineageTag: 6f463b79-91bd-520e-9146-fdfdba59cc32
+		summarizeBy: none
+		sourceColumn: salidas
+
+		annotation SummarizationSetBy = Automatic
+
+	column var_suma_5d
+		dataType: double
+		formatString: 0.00
+		isHidden
+		lineageTag: 5d778433-60ed-554a-bebd-16baf14c5fb3
+		summarizeBy: none
+		sourceColumn: var_suma_5d
+
+		annotation SummarizationSetBy = Automatic
+
+	column var_suma_20d
+		dataType: double
+		formatString: 0.00
+		isHidden
+		lineageTag: 4c2a4878-62b8-557b-adc8-5e0b49f8ac20
+		summarizeBy: none
+		sourceColumn: var_suma_20d
+
+		annotation SummarizationSetBy = Automatic
+
+	column peso_mayor_fondo
+		dataType: double
+		formatString: 0.00
+		isHidden
+		lineageTag: ecec0215-8823-56f4-a891-3da860af427c
+		summarizeBy: none
+		sourceColumn: peso_mayor_fondo
+
+		annotation SummarizationSetBy = Automatic
+
+	column var_precio_20d
+		dataType: double
+		formatString: 0.00
+		isHidden
+		lineageTag: ae5280c7-23f3-5a79-96d1-7149a4878952
+		summarizeBy: none
+		sourceColumn: var_precio_20d
+
+		annotation SummarizationSetBy = Automatic
+
+	column dias_cubrir
+		dataType: double
+		formatString: 0.00
+		isHidden
+		lineageTag: 0180679d-3711-5bb7-9f3e-a375702633ad
+		summarizeBy: none
+		sourceColumn: dias_cubrir
+
+		annotation SummarizationSetBy = Automatic
+
+	partition fact_indicador_diario = m
+		mode: import
+		source =
+				let
+					Origen = Sql.Database(Servidor, BaseDatos),
+					Tabla = Origen{[Schema = "dw", Item = "fact_indicador_diario"]}[Data],
+					Columnas = Table.SelectColumns(Tabla, {"emisor_id", "fecha_id", "suma_pct", "num_fondos", "fondos_nuevos", "salidas", "var_suma_5d", "var_suma_20d", "peso_mayor_fondo", "var_precio_20d", "dias_cubrir"}),
+					Tipos = Table.TransformColumnTypes(Columnas, {{"emisor_id", Int64.Type}, {"fecha_id", Int64.Type}, {"suma_pct", type number}, {"num_fondos", Int64.Type}, {"fondos_nuevos", Int64.Type}, {"salidas", Int64.Type}, {"var_suma_5d", type number}, {"var_suma_20d", type number}, {"peso_mayor_fondo", type number}, {"var_precio_20d", type number}, {"dias_cubrir", type number}})
+				in
+					Tipos
+

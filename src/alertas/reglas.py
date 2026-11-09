@@ -66,7 +66,7 @@ def evaluar(indicadores, nuevos, posiciones, reglas, seguimiento, nombres):
     posiciones: posiciones diarias (para el % del fondo que entra)
     reglas: regla_id, cliente_id, tipo, umbral, ambito (solo las activas)
     seguimiento: cliente_id, lei, rol ('propia' o 'competidora')
-    nombres: lei → nombre del emisor
+    nombres: lei → nombre corto del emisor (el de dim_emisor)
     """
     desconocidas = set(reglas["tipo"]) - TIPOS
     if desconocidas:
@@ -83,12 +83,12 @@ def evaluar(indicadores, nuevos, posiciones, reglas, seguimiento, nombres):
             entradas = entradas.merge(ind, on=["lei", "fecha"])
             for e in entradas.itertuples():
                 filas.append((regla.cliente_id, regla.regla_id, e.lei, e.fecha, e.tenedor, regla.tipo, e.pct,
-                              mensaje(regla.tipo, nombre_corto(nombres[e.lei]), e, regla.umbral, e.tenedor, e.pct)))
+                              mensaje(regla.tipo, nombres[e.lei], e, regla.umbral, e.tenedor, e.pct)))
             continue
         col = INDICADOR[regla.tipo]
         cruza = ind["lei"].isin(leis) & (ind[col] >= regla.umbral) & ~(previo[col] >= regla.umbral)
         for e in ind[cruza].itertuples():
             filas.append((regla.cliente_id, regla.regla_id, e.lei, e.fecha, None, regla.tipo, getattr(e, col),
-                          mensaje(regla.tipo, nombre_corto(nombres[e.lei]), e, regla.umbral)))
+                          mensaje(regla.tipo, nombres[e.lei], e, regla.umbral)))
     alertas = pd.DataFrame(filas, columns=COLUMNAS)
     return alertas.sort_values(["cliente_id", "fecha", "regla_id"], ignore_index=True)

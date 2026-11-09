@@ -1,0 +1,40 @@
+table dim_cliente
+	lineageTag: 8f0db7f4-bb41-57c6-b8b7-d046f15c059d
+
+	column cliente_id
+		dataType: int64
+		formatString: 0
+		isHidden
+		lineageTag: 5c84a05f-0f74-58f6-8996-c684ba8cfd25
+		summarizeBy: none
+		sourceColumn: cliente_id
+
+		annotation SummarizationSetBy = Automatic
+
+	column nombre
+		dataType: string
+		lineageTag: 3d6eea2d-4b84-5b67-9476-f70409a5895a
+		summarizeBy: none
+		sourceColumn: nombre
+
+		annotation SummarizationSetBy = Automatic
+
+	column sector
+		dataType: string
+		lineageTag: b4aa089c-8f05-59e6-b97a-9a9ed0f08458
+		summarizeBy: none
+		sourceColumn: sector
+
+		annotation SummarizationSetBy = Automatic
+
+	partition dim_cliente = m
+		mode: import
+		source =
+				let
+					Origen = Sql.Database(Servidor, BaseDatos),
+					Tabla = Origen{[Schema = "cliente", Item = "dim_cliente"]}[Data],
+					Columnas = Table.SelectColumns(Tabla, {"cliente_id", "nombre", "sector"}),
+					Tipos = Table.TransformColumnTypes(Columnas, {{"cliente_id", Int64.Type}, {"nombre", type text}, {"sector", type text}})
+				in
+					Tipos
+

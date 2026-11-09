@@ -18,7 +18,7 @@ import pandas as pd
 
 from src.modelo.precios import DESDE, INDICE
 
-VERSION_MODELO = "2026-11-09 v2 indicadores"
+VERSION_MODELO = "2026-11-09 v3 nombre corto"
 UMBRAL_ACCIONES = 10
 MESES = ["enero", "febrero", "marzo", "abril", "mayo", "junio", "julio", "agosto",
          "septiembre", "octubre", "noviembre", "diciembre"]
@@ -81,8 +81,15 @@ def dim_fecha(precios, hasta):
 
 
 def dim_emisor(emisores, tickers, precios, acciones):
+    from src.alertas.reglas import nombre_corto
+
     con_precios = set(precios["lei"].dropna())
-    em = emisores.merge(tickers[["lei", "ticker"]], on="lei", how="left")
+    columnas = ["lei", "ticker"] + (["nombre_corto"] if "nombre_corto" in tickers else [])
+    em = emisores.merge(tickers[columnas], on="lei", how="left")
+    if "nombre_corto" not in em:
+        em["nombre_corto"] = None
+    # Nombre revisado a mano en tickers.csv; si falta (emisor nuevo), el automático
+    em["nombre_corto"] = em["nombre_corto"].fillna(em["emisor"].map(nombre_corto))
     em = em.merge(acciones[["lei", "acciones"]].drop_duplicates("lei"), on="lei", how="left")
     return pd.DataFrame({
         "lei": em["lei"], "nombre": em["emisor"], "isins": em["isins"], "ticker": em["ticker"],
@@ -90,6 +97,7 @@ def dim_emisor(emisores, tickers, precios, acciones):
         "primera_notificacion": em["primera"], "ultima_notificacion": em["ultima"],
         "notificaciones": em["notificaciones"].astype("int32"),
         "acciones_circulacion": em["acciones"].astype("Int64"),
+        "nombre_corto": em["nombre_corto"],
     })
 
 

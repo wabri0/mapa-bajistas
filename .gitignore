@@ -14,6 +14,9 @@ local.settings.json
 # Power BI y Office
 ~$*
 *.pbix.bak
+# Ficheros locales que Power BI Desktop crea junto al proyecto (caché de datos y ajustes)
+**/.pbi/localSettings.json
+**/.pbi/cache.abf
 
 # Sistema y editor
 .DS_Store

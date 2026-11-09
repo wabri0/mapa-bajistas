@@ -48,6 +48,7 @@ CREATE TABLE dw.dim_emisor (
     ticker               VARCHAR(20)   NULL,      -- código de Yahoo Finance
     tiene_precios        BIT           NOT NULL,
     acciones_circulacion BIGINT        NULL,      -- dato actual de Yahoo (fase 4)
+    nombre_corto         NVARCHAR(100) NULL,      -- «Grifols» en lugar de «GRIFOLS, S.A.» (fase 5)
     primera_notificacion DATE          NOT NULL,
     ultima_notificacion  DATE          NOT NULL,
     notificaciones       INT           NOT NULL
@@ -69,6 +70,9 @@ GO
 -- Fase 4: columna añadida a una tabla ya creada
 IF COL_LENGTH('dw.dim_emisor', 'acciones_circulacion') IS NULL
     ALTER TABLE dw.dim_emisor ADD acciones_circulacion BIGINT NULL;
+GO
+IF COL_LENGTH('dw.dim_emisor', 'nombre_corto') IS NULL
+    ALTER TABLE dw.dim_emisor ADD nombre_corto NVARCHAR(100) NULL;
 GO
 
 /* ---------- dw: hechos ---------- */
@@ -246,11 +250,14 @@ IF OBJECT_ID('stg.dim_emisor') IS NULL
 CREATE TABLE stg.dim_emisor (
     lei NVARCHAR(20) COLLATE Latin1_General_100_BIN2, nombre NVARCHAR(200), isins NVARCHAR(400),
     ticker NVARCHAR(20), tiene_precios BIT, primera_notificacion DATE, ultima_notificacion DATE,
-    notificaciones INT, acciones_circulacion BIGINT
+    notificaciones INT, acciones_circulacion BIGINT, nombre_corto NVARCHAR(100)
 );
 GO
 IF COL_LENGTH('stg.dim_emisor', 'acciones_circulacion') IS NULL
     ALTER TABLE stg.dim_emisor ADD acciones_circulacion BIGINT;
+GO
+IF COL_LENGTH('stg.dim_emisor', 'nombre_corto') IS NULL
+    ALTER TABLE stg.dim_emisor ADD nombre_corto NVARCHAR(100);
 GO
 
 IF OBJECT_ID('stg.dim_fondo') IS NULL

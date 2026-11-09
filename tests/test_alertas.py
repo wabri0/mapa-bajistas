@@ -99,7 +99,7 @@ def test_los_festivos_no_cuentan_como_sesiones():
 
 # ---------- Reglas ----------
 
-NOMBRES = pd.Series({LEI_A: "EMPRESA A, S.A.", LEI_B: "EMPRESA B, S.A."})
+NOMBRES = pd.Series({LEI_A: "Empresa A", LEI_B: "Empresa B"})
 SEGUIMIENTO = pd.DataFrame({"cliente_id": [1, 2], "lei": [LEI_A, LEI_B], "rol": ["propia", "propia"]})
 
 

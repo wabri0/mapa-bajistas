@@ -1,0 +1,58 @@
+table fact_precio_diario
+	lineageTag: fd6ce69f-d288-5f8c-b0ab-da1e8faff060
+
+	measure 'Cotización €' = AVERAGE(fact_precio_diario[cierre])
+		formatString: 0.00
+		lineageTag: 83ee9689-6ebc-5e03-b06f-00a552767505
+
+	column emisor_id
+		dataType: int64
+		formatString: 0
+		isHidden
+		lineageTag: 762e1c03-4a7c-59f3-b0fb-8bc9164edf70
+		summarizeBy: none
+		sourceColumn: emisor_id
+
+		annotation SummarizationSetBy = Automatic
+
+	column fecha_id
+		dataType: int64
+		formatString: 0
+		isHidden
+		lineageTag: abf2c2eb-8451-5b85-9c1b-742fd5a6e429
+		summarizeBy: none
+		sourceColumn: fecha_id
+
+		annotation SummarizationSetBy = Automatic
+
+	column cierre
+		dataType: double
+		formatString: 0.00
+		isHidden
+		lineageTag: f02d7390-2696-588b-bf92-b1e8638d9eca
+		summarizeBy: none
+		sourceColumn: cierre
+
+		annotation SummarizationSetBy = Automatic
+
+	column volumen
+		dataType: int64
+		formatString: 0
+		isHidden
+		lineageTag: d3fe38a6-1a79-53ca-8ae2-04bae88a0987
+		summarizeBy: none
+		sourceColumn: volumen
+
+		annotation SummarizationSetBy = Automatic
+
+	partition fact_precio_diario = m
+		mode: import
+		source =
+				let
+					Origen = Sql.Database(Servidor, BaseDatos),
+					Tabla = Origen{[Schema = "dw", Item = "fact_precio_diario"]}[Data],
+					Columnas = Table.SelectColumns(Tabla, {"emisor_id", "fecha_id", "cierre", "volumen"}),
+					Tipos = Table.TransformColumnTypes(Columnas, {{"emisor_id", Int64.Type}, {"fecha_id", Int64.Type}, {"cierre", type number}, {"volumen", Int64.Type}})
+				in
+					Tipos
+

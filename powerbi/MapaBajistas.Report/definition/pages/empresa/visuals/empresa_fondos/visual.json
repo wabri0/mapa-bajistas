@@ -1,0 +1,113 @@
+{
+  "$schema": "https://developer.microsoft.com/json-schemas/fabric/item/report/definition/visualContainer/2.0.0/schema.json",
+  "name": "empresa_fondos",
+  "position": {
+    "x": 860,
+    "y": 90,
+    "z": 5000,
+    "width": 400,
+    "height": 295,
+    "tabOrder": 5000
+  },
+  "visual": {
+    "visualType": "tableEx",
+    "query": {
+      "queryState": {
+        "Values": {
+          "projections": [
+            {
+              "field": {
+                "Column": {
+                  "Expression": {
+                    "SourceRef": {
+                      "Entity": "dim_fondo"
+                    }
+                  },
+                  "Property": "tenedor"
+                }
+              },
+              "queryRef": "dim_fondo.tenedor",
+              "nativeQueryRef": "tenedor"
+            },
+            {
+              "field": {
+                "Column": {
+                  "Expression": {
+                    "SourceRef": {
+                      "Entity": "dim_fondo"
+                    }
+                  },
+                  "Property": "grupo_gestor"
+                }
+              },
+              "queryRef": "dim_fondo.grupo_gestor",
+              "nativeQueryRef": "grupo_gestor"
+            },
+            {
+              "field": {
+                "Measure": {
+                  "Expression": {
+                    "SourceRef": {
+                      "Entity": "fact_posicion_diaria"
+                    }
+                  },
+                  "Property": "Cortas hoy %"
+                }
+              },
+              "queryRef": "fact_posicion_diaria.Cortas hoy %",
+              "nativeQueryRef": "Cortas hoy %"
+            }
+          ]
+        }
+      },
+      "sortDefinition": {
+        "sort": [
+          {
+            "field": {
+              "Measure": {
+                "Expression": {
+                  "SourceRef": {
+                    "Entity": "fact_posicion_diaria"
+                  }
+                },
+                "Property": "Cortas hoy %"
+              }
+            },
+            "direction": "Descending"
+          }
+        ],
+        "isDefaultSort": true
+      }
+    },
+    "visualContainerObjects": {
+      "title": [
+        {
+          "properties": {
+            "show": {
+              "expr": {
+                "Literal": {
+                  "Value": "true"
+                }
+              }
+            },
+            "text": {
+              "expr": {
+                "Literal": {
+                  "Value": "'Fondos con posición hoy'"
+                }
+              }
+            },
+            "fontSize": {
+              "expr": {
+                "Literal": {
+                  "Value": "12D"
+                }
+              }
+            }
+          }
+        }
+      ]
+    },
+    "drillFilterOtherVisuals": true
+  }
+}

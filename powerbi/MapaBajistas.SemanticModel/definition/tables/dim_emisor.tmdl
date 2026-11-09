@@ -1,0 +1,64 @@
+table dim_emisor
+	lineageTag: 14108a7a-9d65-5f31-b32c-bc7b6e5d5866
+
+	column emisor_id
+		dataType: int64
+		formatString: 0
+		isHidden
+		lineageTag: 596ef9d1-f148-55cb-851f-07105f7ff120
+		summarizeBy: none
+		sourceColumn: emisor_id
+
+		annotation SummarizationSetBy = Automatic
+
+	column lei
+		dataType: string
+		lineageTag: ec8fdaaa-986c-5b04-aa22-7dfc2508df4e
+		summarizeBy: none
+		sourceColumn: lei
+
+		annotation SummarizationSetBy = Automatic
+
+	column nombre
+		dataType: string
+		lineageTag: 5a9433a0-a2ac-5a7a-a7bd-9de7ac2fd812
+		summarizeBy: none
+		sourceColumn: nombre
+
+		annotation SummarizationSetBy = Automatic
+
+	column nombre_corto
+		dataType: string
+		lineageTag: 4f4a8ea0-9ad7-5a1d-8a08-4d90999128e2
+		summarizeBy: none
+		sourceColumn: nombre_corto
+
+		annotation SummarizationSetBy = Automatic
+
+	column ticker
+		dataType: string
+		lineageTag: 9b25b80d-8137-58ea-a87d-28291d49fd33
+		summarizeBy: none
+		sourceColumn: ticker
+
+		annotation SummarizationSetBy = Automatic
+
+	column tiene_precios
+		dataType: boolean
+		lineageTag: 9c1f2ebc-5934-5f55-94a5-134649450300
+		summarizeBy: none
+		sourceColumn: tiene_precios
+
+		annotation SummarizationSetBy = Automatic
+
+	partition dim_emisor = m
+		mode: import
+		source =
+				let
+					Origen = Sql.Database(Servidor, BaseDatos),
+					Tabla = Origen{[Schema = "dw", Item = "dim_emisor"]}[Data],
+					Columnas = Table.SelectColumns(Tabla, {"emisor_id", "lei", "nombre", "nombre_corto", "ticker", "tiene_precios"}),
+					Tipos = Table.TransformColumnTypes(Columnas, {{"emisor_id", Int64.Type}, {"lei", type text}, {"nombre", type text}, {"nombre_corto", type text}, {"ticker", type text}, {"tiene_precios", type logical}})
+				in
+					Tipos
+

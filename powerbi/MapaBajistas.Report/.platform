@@ -1,0 +1,11 @@
+{
+  "$schema": "https://developer.microsoft.com/json-schemas/fabric/gitIntegration/platformProperties/2.0.0/schema.json",
+  "metadata": {
+    "type": "Report",
+    "displayName": "MapaBajistas"
+  },
+  "config": {
+    "version": "2.0",
+    "logicalId": "0be8cc7d-63f4-5a16-b250-c52b33942a23"
+  }
+}

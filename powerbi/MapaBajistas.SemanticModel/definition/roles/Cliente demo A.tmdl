@@ -1,0 +1,4 @@
+role 'Cliente demo A'
+	modelPermission: read
+
+	tablePermission dim_cliente = dim_cliente[cliente_id] = 1

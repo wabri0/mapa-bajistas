@@ -32,7 +32,7 @@ ESQUEMA_STG = {
                   "semana_iso": ENTERO, "es_dia_bolsa": LOGICO, "origen_calendario": TEXTO},
     "dim_emisor": {"lei": TEXTO, "nombre": TEXTO, "isins": TEXTO, "ticker": TEXTO, "tiene_precios": LOGICO,
                    "primera_notificacion": FECHA, "ultima_notificacion": FECHA, "notificaciones": ENTERO,
-                   "acciones_circulacion": ENTERO_LARGO},
+                   "acciones_circulacion": ENTERO_LARGO, "nombre_corto": TEXTO},
     "dim_fondo": {"tenedor": TEXTO, "grupo_gestor": TEXTO, "grupo_revisado": LOGICO,
                   "primera_notificacion": FECHA, "ultima_notificacion": FECHA, "notificaciones": ENTERO},
     "posicion_diaria": {"fecha": FECHA, "lei": TEXTO, "tenedor": TEXTO, "pct": DECIMAL},
@@ -102,7 +102,7 @@ def leer_reglas(cur):
 def cargar_alertas(cur, tablas):
     """Evalúa las reglas de todos los clientes y carga cliente.alerta. Devuelve (resumen, nuevas recientes)."""
     reglas, seguimiento = leer_reglas(cur)
-    nombres = tablas["dim_emisor"].set_index("lei")["nombre"]
+    nombres = tablas["dim_emisor"].set_index("lei")["nombre_corto"]
     alertas = reglas_alerta.evaluar(tablas["indicador_diario"], tablas["fondo_nuevo"], tablas["posicion_diaria"],
                                     reglas, seguimiento, nombres)
     copiar(cur, "alerta", alertas, ESQUEMA_ALERTA)

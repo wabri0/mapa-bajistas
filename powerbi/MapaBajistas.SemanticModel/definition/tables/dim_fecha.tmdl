@@ -1,0 +1,88 @@
+table dim_fecha
+	lineageTag: b40c83bf-1f7c-5391-a274-7f86a409593c
+
+	column fecha_id
+		dataType: int64
+		formatString: 0
+		isHidden
+		lineageTag: a4d53f56-7c3d-5323-9a60-5e40e4ef42b0
+		summarizeBy: none
+		sourceColumn: fecha_id
+
+		annotation SummarizationSetBy = Automatic
+
+	column fecha
+		dataType: dateTime
+		formatString: dd/mm/yyyy
+		lineageTag: ff549a77-8c1a-5fc1-8f9e-4ac3905fddce
+		summarizeBy: none
+		sourceColumn: fecha
+
+		annotation SummarizationSetBy = Automatic
+
+		annotation UnderlyingDateTimeDataType = Date
+
+	column anio
+		dataType: int64
+		formatString: 0
+		lineageTag: d57b0982-ebfe-5e8a-9df0-5c4c19747e4b
+		summarizeBy: none
+		sourceColumn: anio
+
+		annotation SummarizationSetBy = Automatic
+
+	column trimestre
+		dataType: int64
+		formatString: 0
+		lineageTag: 1f7cd564-f01e-5865-a9e2-43c480f594c4
+		summarizeBy: none
+		sourceColumn: trimestre
+
+		annotation SummarizationSetBy = Automatic
+
+	column mes
+		dataType: int64
+		formatString: 0
+		lineageTag: 9742ec23-e668-5c72-a7c4-f00a0014ca31
+		summarizeBy: none
+		sourceColumn: mes
+
+		annotation SummarizationSetBy = Automatic
+
+	column nombre_mes
+		dataType: string
+		lineageTag: 5280428b-3bc1-5244-91d8-2dbbfaf55503
+		summarizeBy: none
+		sourceColumn: nombre_mes
+		sortByColumn: mes
+
+		annotation SummarizationSetBy = Automatic
+
+	column es_dia_bolsa
+		dataType: boolean
+		lineageTag: e19abd27-ca15-5999-b89d-831e527d8020
+		summarizeBy: none
+		sourceColumn: es_dia_bolsa
+
+		annotation SummarizationSetBy = Automatic
+
+	column anio_mes
+		dataType: string
+		lineageTag: fc884bde-009e-5fea-997e-62f5041272de
+		summarizeBy: none
+		sourceColumn: anio_mes
+
+		annotation SummarizationSetBy = Automatic
+
+	partition dim_fecha = m
+		mode: import
+		source =
+				let
+					Origen = Sql.Database(Servidor, BaseDatos),
+					Tabla = Origen{[Schema = "dw", Item = "dim_fecha"]}[Data],
+					Columnas = Table.SelectColumns(Tabla, {"fecha_id", "fecha", "anio", "trimestre", "mes", "nombre_mes", "es_dia_bolsa"}),
+					Tipos = Table.TransformColumnTypes(Columnas, {{"fecha_id", Int64.Type}, {"fecha", type date}, {"anio", Int64.Type}, {"trimestre", Int64.Type}, {"mes", Int64.Type}, {"nombre_mes", type text}, {"es_dia_bolsa", type logical}}),
+					ConMes = Table.AddColumn(Tipos, "anio_mes", each Text.From([anio]) & "-" & Text.PadStart(Text.From([mes]), 2, "0"), type text)
+				in
+					ConMes
+

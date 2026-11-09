@@ -1,0 +1,29 @@
+model Model
+	culture: es-ES
+	defaultPowerBIDataSourceVersion: powerBI_V3
+	discourageImplicitMeasures
+	sourceQueryCulture: es-ES
+	dataAccessOptions
+		legacyRedirects
+		returnErrorValuesAsNull
+
+annotation __PBI_TimeIntelligenceEnabled = 0
+
+annotation PBI_QueryOrder = ["Servidor", "BaseDatos", "dim_fecha", "dim_emisor", "dim_fondo", "fact_posicion_diaria", "fact_precio_diario", "fact_indicador_diario", "fact_notificacion", "dim_cliente", "cliente_emisor", "alerta", "nota", "regla_alerta"]
+
+ref table dim_fecha
+ref table dim_emisor
+ref table dim_fondo
+ref table fact_posicion_diaria
+ref table fact_precio_diario
+ref table fact_indicador_diario
+ref table fact_notificacion
+ref table dim_cliente
+ref table cliente_emisor
+ref table alerta
+ref table nota
+ref table regla_alerta
+
+ref role 'Cliente demo A'
+ref role 'Cliente demo B'
+ref role Consultora

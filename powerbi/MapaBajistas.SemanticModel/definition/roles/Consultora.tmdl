@@ -1,0 +1,2 @@
+role Consultora
+	modelPermission: read

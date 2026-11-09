@@ -1,0 +1,9 @@
+expression Servidor = "sql-mapa-bajistas.database.windows.net" meta [IsParameterQuery = true, Type = "Text", IsParameterQueryRequired = true]
+	lineageTag: c3e427c4-03ac-58c3-b208-c0e053387844
+
+	annotation PBI_ResultType = Text
+
+expression BaseDatos = "sqldb-mapa-bajistas" meta [IsParameterQuery = true, Type = "Text", IsParameterQueryRequired = true]
+	lineageTag: bb16cf2e-e620-5f45-901f-84798cb6bafe
+
+	annotation PBI_ResultType = Text

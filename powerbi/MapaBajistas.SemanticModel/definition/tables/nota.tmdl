@@ -1,0 +1,82 @@
+table nota
+	lineageTag: 30060090-b28e-5bfe-bd15-77fb2a3afbec
+
+	column nota_id
+		dataType: int64
+		formatString: 0
+		isHidden
+		lineageTag: 39a931a8-0e3d-5367-9f72-f755ecf15c4d
+		summarizeBy: none
+		sourceColumn: nota_id
+
+		annotation SummarizationSetBy = Automatic
+
+	column cliente_id
+		dataType: int64
+		formatString: 0
+		isHidden
+		lineageTag: 190638ae-cd78-5c15-88f7-6036de85ee25
+		summarizeBy: none
+		sourceColumn: cliente_id
+
+		annotation SummarizationSetBy = Automatic
+
+	column emisor_id
+		dataType: int64
+		formatString: 0
+		isHidden
+		lineageTag: a2806b8a-d950-5313-85df-5d09801f71be
+		summarizeBy: none
+		sourceColumn: emisor_id
+
+		annotation SummarizationSetBy = Automatic
+
+	column fecha_id
+		dataType: int64
+		formatString: 0
+		isHidden
+		lineageTag: c6b552d2-0472-50a2-aafc-ff8ddfa00771
+		summarizeBy: none
+		sourceColumn: fecha_id
+
+		annotation SummarizationSetBy = Automatic
+
+	column texto
+		dataType: string
+		lineageTag: 63c5dc24-1b47-5060-911d-1d1e0810f368
+		summarizeBy: none
+		sourceColumn: texto
+
+		annotation SummarizationSetBy = Automatic
+
+	column autor
+		dataType: string
+		lineageTag: c8b2a66f-2466-5091-ae72-560cb7e8ad5f
+		summarizeBy: none
+		sourceColumn: autor
+
+		annotation SummarizationSetBy = Automatic
+
+	column fecha
+		dataType: dateTime
+		formatString: dd/mm/yyyy
+		lineageTag: f57733bf-84c0-5beb-a608-3280fc2a899d
+		summarizeBy: none
+		sourceColumn: fecha
+
+		annotation SummarizationSetBy = Automatic
+
+		annotation UnderlyingDateTimeDataType = Date
+
+	partition nota = m
+		mode: import
+		source =
+				let
+					Origen = Sql.Database(Servidor, BaseDatos),
+					Tabla = Origen{[Schema = "cliente", Item = "nota"]}[Data],
+					Columnas = Table.SelectColumns(Tabla, {"nota_id", "cliente_id", "emisor_id", "fecha_id", "texto", "autor"}),
+					Tipos = Table.TransformColumnTypes(Columnas, {{"nota_id", Int64.Type}, {"cliente_id", Int64.Type}, {"emisor_id", Int64.Type}, {"fecha_id", Int64.Type}, {"texto", type text}, {"autor", type text}}),
+					ConFecha = Table.AddColumn(Tipos, "fecha", each #date(Number.IntegerDivide([fecha_id], 10000), Number.Mod(Number.IntegerDivide([fecha_id], 100), 100), Number.Mod([fecha_id], 100)), type date)
+				in
+					ConFecha
+

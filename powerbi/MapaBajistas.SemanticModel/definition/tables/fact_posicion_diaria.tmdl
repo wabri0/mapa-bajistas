@@ -1,0 +1,86 @@
+table fact_posicion_diaria
+	lineageTag: a9f2896b-f8c9-5bf2-9dfc-3675ccc3a0e6
+
+	measure 'Último día' = CALCULATE(MAX(fact_posicion_diaria[fecha_id]), REMOVEFILTERS())
+		formatString: 0
+		isHidden
+		lineageTag: 2f29387a-9c66-5361-b397-357ad99bb7dd
+
+	measure 'Cortas hoy %' = VAR f = [Último día] RETURN CALCULATE(SUM(fact_posicion_diaria[pct]), REMOVEFILTERS(dim_fecha), dim_fecha[fecha_id] = f)
+		formatString: 0.00
+		lineageTag: 59bc72fb-8bfb-5c82-a374-c3cd38cf9e26
+
+	measure 'Fondos hoy' = VAR f = [Último día] RETURN CALCULATE(DISTINCTCOUNT(fact_posicion_diaria[fondo_id]), REMOVEFILTERS(dim_fecha), dim_fecha[fecha_id] = f)
+		formatString: 0
+		lineageTag: 702e183d-7de9-5997-9ca3-365330e98bd9
+
+	measure 'Empresas con cortos hoy' = VAR f = [Último día] RETURN CALCULATE(DISTINCTCOUNT(fact_posicion_diaria[emisor_id]), REMOVEFILTERS(dim_fecha), dim_fecha[fecha_id] = f)
+		formatString: 0
+		lineageTag: c451728a-a3ce-5789-9f0f-1a6aef0cb599
+
+	measure 'Gestoras hoy' = VAR f = [Último día] RETURN CALCULATE(CALCULATE(DISTINCTCOUNT(dim_fondo[grupo_gestor]), fact_posicion_diaria), REMOVEFILTERS(dim_fecha), dim_fecha[fecha_id] = f)
+		formatString: 0
+		lineageTag: bb0abf22-5b2b-5b83-a585-c5a9375fc0ac
+
+	measure 'Fecha de los datos' = VAR f = [Último día] RETURN "Posiciones publicadas hasta el " & FORMAT(LOOKUPVALUE(dim_fecha[fecha], dim_fecha[fecha_id], f), "dd/mm/yyyy")
+		lineageTag: 97af224c-3c8a-54dc-b0a4-c2fd39df60f5
+
+	measure 'Color calor hoy' = VAR v = [Cortas hoy %] RETURN SWITCH(TRUE(), ISBLANK(v), BLANK(), v >= 3, "#B91C1C", v >= 2, "#DC2626", v >= 1, "#F87171", v > 0, "#FCA5A5", "#FFFFFF")
+		isHidden
+		lineageTag: 9461c4d2-ef40-5689-9623-9120742ee1ef
+
+	measure 'Color texto calor hoy' = IF([Cortas hoy %] >= 2, "#FFFFFF", "#15212C")
+		isHidden
+		lineageTag: b34f7919-a98e-5e44-a3d4-3ca7505664da
+
+	column emisor_id
+		dataType: int64
+		formatString: 0
+		isHidden
+		lineageTag: d078f4a3-b468-5d39-84a2-9437ee0add61
+		summarizeBy: none
+		sourceColumn: emisor_id
+
+		annotation SummarizationSetBy = Automatic
+
+	column fecha_id
+		dataType: int64
+		formatString: 0
+		isHidden
+		lineageTag: 8d821265-6fe1-55cd-9fb4-942906273784
+		summarizeBy: none
+		sourceColumn: fecha_id
+
+		annotation SummarizationSetBy = Automatic
+
+	column fondo_id
+		dataType: int64
+		formatString: 0
+		isHidden
+		lineageTag: 598ab00d-8592-5272-9ea5-c02ec193fde8
+		summarizeBy: none
+		sourceColumn: fondo_id
+
+		annotation SummarizationSetBy = Automatic
+
+	column pct
+		dataType: double
+		formatString: 0.00
+		isHidden
+		lineageTag: d1324f02-effc-510b-8516-1568cf501810
+		summarizeBy: none
+		sourceColumn: pct
+
+		annotation SummarizationSetBy = Automatic
+
+	partition fact_posicion_diaria = m
+		mode: import
+		source =
+				let
+					Origen = Sql.Database(Servidor, BaseDatos),
+					Tabla = Origen{[Schema = "dw", Item = "fact_posicion_diaria"]}[Data],
+					Columnas = Table.SelectColumns(Tabla, {"emisor_id", "fecha_id", "fondo_id", "pct"}),
+					Tipos = Table.TransformColumnTypes(Columnas, {{"emisor_id", Int64.Type}, {"fecha_id", Int64.Type}, {"fondo_id", Int64.Type}, {"pct", type number}})
+				in
+					Tipos
+
