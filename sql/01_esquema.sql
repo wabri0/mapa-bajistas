@@ -47,6 +47,7 @@ CREATE TABLE dw.dim_emisor (
     isins                VARCHAR(400)  NOT NULL,  -- todos los ISIN con los que ha notificado, separados por comas
     ticker               VARCHAR(20)   NULL,      -- código de Yahoo Finance
     tiene_precios        BIT           NOT NULL,
+    acciones_circulacion BIGINT        NULL,      -- dato actual de Yahoo (fase 4)
     primera_notificacion DATE          NOT NULL,
     ultima_notificacion  DATE          NOT NULL,
     notificaciones       INT           NOT NULL
@@ -63,6 +64,11 @@ CREATE TABLE dw.dim_fondo (
     ultima_notificacion  DATE          NOT NULL,
     notificaciones       INT           NOT NULL
 );
+GO
+
+-- Fase 4: columna añadida a una tabla ya creada
+IF COL_LENGTH('dw.dim_emisor', 'acciones_circulacion') IS NULL
+    ALTER TABLE dw.dim_emisor ADD acciones_circulacion BIGINT NULL;
 GO
 
 /* ---------- dw: hechos ---------- */
@@ -100,6 +106,27 @@ CREATE TABLE dw.fact_notificacion (
 );
 GO
 
+/* Fase 4: indicadores diarios por emisor (se calculan en Python, src/alertas/indicadores.py) */
+IF OBJECT_ID('dw.fact_indicador_diario') IS NULL
+CREATE TABLE dw.fact_indicador_diario (
+    emisor_id         INT            NOT NULL CONSTRAINT fk_indicador_emisor REFERENCES dw.dim_emisor (emisor_id),
+    fecha_id          INT            NOT NULL CONSTRAINT fk_indicador_fecha  REFERENCES dw.dim_fecha (fecha_id),
+    suma_pct          DECIMAL(7, 4)  NOT NULL,  -- suma de posiciones cortas publicadas (%)
+    num_fondos        SMALLINT       NOT NULL,
+    fondos_nuevos     SMALLINT       NOT NULL,  -- sin posición en las 20 sesiones anteriores
+    salidas           SMALLINT       NOT NULL,
+    var_suma_5d       DECIMAL(7, 4)  NOT NULL,  -- puntos porcentuales
+    var_suma_20d      DECIMAL(7, 4)  NOT NULL,
+    peso_mayor_fondo  DECIMAL(7, 4)  NULL,      -- % de la suma en manos del mayor fondo
+    cierre            DECIMAL(19, 6) NULL,
+    var_precio_5d     DECIMAL(9, 4)  NULL,      -- %
+    var_precio_20d    DECIMAL(9, 4)  NULL,
+    volumen_medio_20d DECIMAL(19, 2) NULL,
+    dias_cubrir       DECIMAL(9, 2)  NULL,      -- sesiones para recomprar con el volumen medio
+    CONSTRAINT pk_fact_indicador_diario PRIMARY KEY (emisor_id, fecha_id)
+);
+GO
+
 /* Registro de cargas: qué fichero de la CNMV y qué versión de las reglas hay en la base */
 IF OBJECT_ID('dw.carga') IS NULL
 CREATE TABLE dw.carga (
@@ -112,8 +139,12 @@ CREATE TABLE dw.carga (
     filas_precio        INT           NOT NULL,
     filas_notificacion  INT           NOT NULL,
     ultimo_dia_posicion DATE          NULL,
-    ultimo_dia_precio   DATE          NULL
+    ultimo_dia_precio   DATE          NULL,
+    filas_indicador     INT           NULL
 );
+GO
+IF COL_LENGTH('dw.carga', 'filas_indicador') IS NULL
+    ALTER TABLE dw.carga ADD filas_indicador INT NULL;
 GO
 
 /* ---------- cliente: datos confidenciales ---------- */
@@ -146,6 +177,7 @@ CREATE TABLE cliente.alerta (
     mensaje    NVARCHAR(500) NOT NULL,
     valor      DECIMAL(9, 4) NULL,
     creada_utc DATETIME2(0)  NOT NULL CONSTRAINT df_alerta_creada DEFAULT SYSUTCDATETIME()
+    -- regla_id, fondo_id y enviada_utc se añaden más abajo (fase 4), después de crear regla_alerta
 );
 GO
 
@@ -159,6 +191,35 @@ CREATE TABLE cliente.nota (
     autor      NVARCHAR(128)  NOT NULL CONSTRAINT df_nota_autor DEFAULT USER_NAME(),
     creada_utc DATETIME2(0)   NOT NULL CONSTRAINT df_nota_creada DEFAULT SYSUTCDATETIME()
 );
+GO
+
+/* Fase 4: reglas de alerta de cada cliente (tipos en src/alertas/reglas.py) */
+IF OBJECT_ID('cliente.regla_alerta') IS NULL
+CREATE TABLE cliente.regla_alerta (
+    regla_id    INT IDENTITY(1, 1) NOT NULL CONSTRAINT pk_regla_alerta PRIMARY KEY,
+    cliente_id  INT           NOT NULL CONSTRAINT fk_regla_cliente REFERENCES cliente.dim_cliente (cliente_id),
+    tipo        VARCHAR(30)   NOT NULL CONSTRAINT ck_regla_tipo CHECK (tipo IN (
+                    'fondo_nuevo', 'suma_supera', 'suma_sube_5d', 'suma_sube_20d', 'fondos_supera',
+                    'dias_cubrir_supera')),
+    umbral      DECIMAL(9, 4) NULL,
+    ambito      VARCHAR(12)   NOT NULL CONSTRAINT ck_regla_ambito CHECK (ambito IN ('propia', 'competidora', 'todas')),
+    descripcion NVARCHAR(200) NOT NULL,
+    activa      BIT           NOT NULL CONSTRAINT df_regla_activa DEFAULT 1,
+    CONSTRAINT ck_regla_umbral CHECK (tipo = 'fondo_nuevo' OR umbral IS NOT NULL)
+);
+GO
+
+-- Fase 4: columnas de cliente.alerta
+--   regla_id     regla que la generó
+--   fondo_id     fondo que entra (reglas fondo_nuevo)
+--   enviada_utc  cuándo se envió por correo (en producción; el prototipo solo las registra)
+IF COL_LENGTH('cliente.alerta', 'regla_id') IS NULL
+    ALTER TABLE cliente.alerta ADD regla_id INT NULL CONSTRAINT fk_alerta_regla REFERENCES cliente.regla_alerta (regla_id),
+                                   fondo_id INT NULL CONSTRAINT fk_alerta_fondo REFERENCES dw.dim_fondo (fondo_id),
+                                   enviada_utc DATETIME2(0) NULL;
+GO
+IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'uq_alerta_evento')
+    CREATE UNIQUE INDEX uq_alerta_evento ON cliente.alerta (cliente_id, regla_id, emisor_id, fecha_id, fondo_id);
 GO
 
 /* Qué usuario de la base de datos pertenece a qué cliente. La consulta la regla de RLS. */
@@ -185,8 +246,11 @@ IF OBJECT_ID('stg.dim_emisor') IS NULL
 CREATE TABLE stg.dim_emisor (
     lei NVARCHAR(20) COLLATE Latin1_General_100_BIN2, nombre NVARCHAR(200), isins NVARCHAR(400),
     ticker NVARCHAR(20), tiene_precios BIT, primera_notificacion DATE, ultima_notificacion DATE,
-    notificaciones INT
+    notificaciones INT, acciones_circulacion BIGINT
 );
+GO
+IF COL_LENGTH('stg.dim_emisor', 'acciones_circulacion') IS NULL
+    ALTER TABLE stg.dim_emisor ADD acciones_circulacion BIGINT;
 GO
 
 IF OBJECT_ID('stg.dim_fondo') IS NULL
@@ -215,5 +279,20 @@ CREATE TABLE stg.notificacion (
     fecha DATE, lei NVARCHAR(20) COLLATE Latin1_General_100_BIN2,
     tenedor NVARCHAR(200) COLLATE Latin1_General_100_BIN2, isin NVARCHAR(12), pct FLOAT,
     fecha_primera_captura DATETIME2(0)
+);
+GO
+
+IF OBJECT_ID('stg.indicador_diario') IS NULL
+CREATE TABLE stg.indicador_diario (
+    fecha DATE, lei NVARCHAR(20) COLLATE Latin1_General_100_BIN2, suma_pct FLOAT, num_fondos INT,
+    fondos_nuevos INT, salidas INT, var_suma_5d FLOAT, var_suma_20d FLOAT, peso_mayor_fondo FLOAT,
+    cierre FLOAT, var_precio_5d FLOAT, var_precio_20d FLOAT, volumen_medio_20d FLOAT, dias_cubrir FLOAT
+);
+GO
+
+IF OBJECT_ID('stg.alerta') IS NULL
+CREATE TABLE stg.alerta (
+    cliente_id INT, regla_id INT, lei NVARCHAR(20) COLLATE Latin1_General_100_BIN2, fecha DATE,
+    tenedor NVARCHAR(200) COLLATE Latin1_General_100_BIN2, tipo NVARCHAR(40), valor FLOAT, mensaje NVARCHAR(500)
 );
 GO

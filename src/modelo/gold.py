@@ -18,7 +18,7 @@ import pandas as pd
 
 from src.modelo.precios import DESDE, INDICE
 
-VERSION_MODELO = "2026-11-09 v1"
+VERSION_MODELO = "2026-11-09 v2 indicadores"
 UMBRAL_ACCIONES = 10
 MESES = ["enero", "febrero", "marzo", "abril", "mayo", "junio", "julio", "agosto",
          "septiembre", "octubre", "noviembre", "diciembre"]
@@ -80,14 +80,16 @@ def dim_fecha(precios, hasta):
     })
 
 
-def dim_emisor(emisores, tickers, precios):
+def dim_emisor(emisores, tickers, precios, acciones):
     con_precios = set(precios["lei"].dropna())
     em = emisores.merge(tickers[["lei", "ticker"]], on="lei", how="left")
+    em = em.merge(acciones[["lei", "acciones"]].drop_duplicates("lei"), on="lei", how="left")
     return pd.DataFrame({
         "lei": em["lei"], "nombre": em["emisor"], "isins": em["isins"], "ticker": em["ticker"],
         "tiene_precios": em["lei"].isin(con_precios),
         "primera_notificacion": em["primera"], "ultima_notificacion": em["ultima"],
         "notificaciones": em["notificaciones"].astype("int32"),
+        "acciones_circulacion": em["acciones"].astype("Int64"),
     })
 
 
@@ -100,9 +102,17 @@ def dim_fondo(fondos):
     })
 
 
-def construir(silver, precios, hoy):
-    """silver: dict con las tablas de silver/cnmv. Devuelve (tablas gold, informe)."""
+def construir(silver, precios, hoy, acciones=None):
+    """silver: dict con las tablas de silver/cnmv; acciones: lei → acciones en circulación (opcional).
+
+    Devuelve (tablas gold, informe). Además de las tablas que se cargan en SQL, incluye
+    «fondo_nuevo» (entradas de fondos), que usan las reglas de alerta.
+    """
+    from src.alertas import indicadores
     from src.modelo.precios import tabla_tickers
+
+    if acciones is None:
+        acciones = pd.DataFrame({"lei": pd.Series(dtype=str), "acciones": pd.Series(dtype="int64")})
 
     fechas = dim_fecha(precios, hoy)
     bolsa = set(fechas.loc[fechas["es_dia_bolsa"], "fecha"])
@@ -111,12 +121,14 @@ def construir(silver, precios, hoy):
     en_bolsa = diarias["fecha"].isin(bolsa)
     posiciones = diarias.loc[en_bolsa, ["fecha", "lei", "tenedor", "pct"]].reset_index(drop=True)
 
-    acciones = precios[precios["lei"].notna()]
-    en_bolsa_precio = acciones["fecha"].isin(bolsa)
-    precios_gold = acciones.loc[en_bolsa_precio, ["fecha", "lei", "cierre", "cierre_ajustado", "volumen"]]
+    cotizaciones = precios[precios["lei"].notna()]
+    en_bolsa_precio = cotizaciones["fecha"].isin(bolsa)
+    precios_gold = cotizaciones.loc[en_bolsa_precio, ["fecha", "lei", "cierre", "cierre_ajustado", "volumen"]]
     # Un mismo emisor podría tener dos códigos: se queda el de mayor volumen cada día
     precios_gold = (precios_gold.sort_values("volumen").drop_duplicates(["fecha", "lei"], keep="last")
                     .sort_values(["lei", "fecha"], ignore_index=True))
+    # Yahoo da cierres ajustados negativos en algún valor (Duro Felguera): no tienen sentido
+    precios_gold["cierre_ajustado"] = precios_gold["cierre_ajustado"].where(precios_gold["cierre_ajustado"] > 0)
 
     notif = silver["notificaciones"]
     notificaciones = pd.DataFrame({
@@ -125,13 +137,16 @@ def construir(silver, precios, hoy):
         "fecha_primera_captura": pd.to_datetime(notif["fecha_primera_captura"]),
     })
 
+    indicador, nuevos = indicadores.calcular(posiciones, precios_gold, fechas, acciones)
     tablas = {
         "dim_fecha": fechas,
-        "dim_emisor": dim_emisor(silver["emisores"], tabla_tickers(), precios),
+        "dim_emisor": dim_emisor(silver["emisores"], tabla_tickers(), precios, acciones),
         "dim_fondo": dim_fondo(silver["fondos"]),
         "posicion_diaria": posiciones,
         "precio_diario": precios_gold,
         "notificacion": notificaciones,
+        "indicador_diario": indicador,
+        "fondo_nuevo": nuevos,
     }
     festivos = diarias.loc[~en_bolsa, "fecha"]
     informe = {

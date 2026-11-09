@@ -104,6 +104,11 @@ def actualizar(almacen_silver, ahora=None):
     buf = io.BytesIO()
     precios.to_parquet(buf, index=False)
     almacen_silver.escribir_bytes(f"{PREFIJO}/precios.parquet", buf.getvalue(), sobrescribir=True)
+    try:
+        acciones = actualizar_acciones(almacen_silver, tickers, ahora)
+        informe["emisores_con_acciones"] = int(acciones["lei"].nunique())
+    except Exception as e:  # sin acciones solo falta «días para cubrir»: no debe parar nada
+        logging.warning("INGESTA_CNMV_REVISAR Acciones en circulación no actualizadas: %s", e)
     almacen_silver.escribir_texto(f"{PREFIJO}/calidad.json", json.dumps(informe, indent=2, ensure_ascii=False))
     return informe
 
@@ -111,4 +116,46 @@ def actualizar(almacen_silver, ahora=None):
 def leer(almacen_silver):
     """Los últimos precios guardados en silver, o None si aún no hay."""
     contenido = almacen_silver.leer_bytes(f"{PREFIJO}/precios.parquet")
+    return pd.read_parquet(io.BytesIO(contenido)) if contenido else None
+
+
+def descargar_acciones(tickers):
+    """Acciones en circulación actuales de cada ticker. Los que fallan no aparecen.
+
+    Se usa el dato actual y no el histórico: el histórico de Yahoo tiene errores graves
+    (p. ej. Duro Felguera con 58.000 millones de acciones durante dos años).
+    """
+    from concurrent.futures import ThreadPoolExecutor
+
+    import yfinance as yf
+
+    def una(ticker):
+        try:
+            return ticker, yf.Ticker(ticker).fast_info.get("shares")
+        except Exception:
+            return ticker, None
+
+    with ThreadPoolExecutor(max_workers=8) as hilos:
+        resultados = list(hilos.map(una, sorted(set(tickers))))
+    return pd.DataFrame([(t, int(n)) for t, n in resultados if n], columns=["ticker", "acciones"])
+
+
+def actualizar_acciones(almacen_silver, tickers, ahora):
+    """Guarda las acciones en circulación por emisor; si un valor falla, conserva el dato anterior."""
+    nuevas = descargar_acciones(tickers["ticker"].dropna())
+    nuevas["consulta_utc"] = pd.Timestamp(ahora).tz_convert(None) if pd.Timestamp(ahora).tzinfo else pd.Timestamp(ahora)
+    previas = leer_acciones(almacen_silver)
+    if previas is not None:
+        nuevas = pd.concat([nuevas, previas[~previas["ticker"].isin(nuevas["ticker"])][nuevas.columns]])
+    mapa = tickers.dropna(subset=["ticker"]).set_index("ticker")["lei"]
+    acciones = nuevas.assign(lei=nuevas["ticker"].map(mapa))[["lei", "ticker", "acciones", "consulta_utc"]]
+    acciones = acciones.sort_values("lei", ignore_index=True)
+    buf = io.BytesIO()
+    acciones.to_parquet(buf, index=False)
+    almacen_silver.escribir_bytes(f"{PREFIJO}/acciones.parquet", buf.getvalue(), sobrescribir=True)
+    return acciones
+
+
+def leer_acciones(almacen_silver):
+    contenido = almacen_silver.leer_bytes(f"{PREFIJO}/acciones.parquet")
     return pd.read_parquet(io.BytesIO(contenido)) if contenido else None

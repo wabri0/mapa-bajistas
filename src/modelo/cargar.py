@@ -18,6 +18,7 @@ import pandas as pd
 
 from src.ingesta.cnmv import ErrorIngesta
 from src.limpieza import silver
+from src.alertas import reglas as reglas_alerta
 from src.modelo import bd, gold, precios
 
 RUTA_ESTADO = "gold/estado.json"
@@ -30,7 +31,8 @@ ESQUEMA_STG = {
                   "nombre_mes": TEXTO, "dia": ENTERO, "dia_semana": ENTERO, "nombre_dia": TEXTO,
                   "semana_iso": ENTERO, "es_dia_bolsa": LOGICO, "origen_calendario": TEXTO},
     "dim_emisor": {"lei": TEXTO, "nombre": TEXTO, "isins": TEXTO, "ticker": TEXTO, "tiene_precios": LOGICO,
-                   "primera_notificacion": FECHA, "ultima_notificacion": FECHA, "notificaciones": ENTERO},
+                   "primera_notificacion": FECHA, "ultima_notificacion": FECHA, "notificaciones": ENTERO,
+                   "acciones_circulacion": ENTERO_LARGO},
     "dim_fondo": {"tenedor": TEXTO, "grupo_gestor": TEXTO, "grupo_revisado": LOGICO,
                   "primera_notificacion": FECHA, "ultima_notificacion": FECHA, "notificaciones": ENTERO},
     "posicion_diaria": {"fecha": FECHA, "lei": TEXTO, "tenedor": TEXTO, "pct": DECIMAL},
@@ -38,7 +40,14 @@ ESQUEMA_STG = {
                       "volumen": ENTERO_LARGO},
     "notificacion": {"fecha": FECHA, "lei": TEXTO, "tenedor": TEXTO, "isin": TEXTO, "pct": DECIMAL,
                      "fecha_primera_captura": MOMENTO},
+    "indicador_diario": {"fecha": FECHA, "lei": TEXTO, "suma_pct": DECIMAL, "num_fondos": ENTERO,
+                         "fondos_nuevos": ENTERO, "salidas": ENTERO, "var_suma_5d": DECIMAL, "var_suma_20d": DECIMAL,
+                         "peso_mayor_fondo": DECIMAL, "cierre": DECIMAL, "var_precio_5d": DECIMAL,
+                         "var_precio_20d": DECIMAL, "volumen_medio_20d": DECIMAL, "dias_cubrir": DECIMAL},
 }
+# Las alertas se cargan aparte, después de dw.usp_cargar (necesitan las reglas de la base)
+ESQUEMA_ALERTA = {"cliente_id": ENTERO, "regla_id": ENTERO, "lei": TEXTO, "fecha": FECHA, "tenedor": TEXTO,
+                  "tipo": TEXTO, "valor": DECIMAL, "mensaje": TEXTO}
 
 
 def a_arrow(df, esquema):
@@ -56,14 +65,56 @@ def a_arrow(df, esquema):
             valores = pd.to_datetime(serie).to_numpy().astype("datetime64[us]")
         elif tipo == TEXTO:
             valores = serie.astype(object).where(serie.notna(), None).to_numpy()
+        elif tipo in (ENTERO, ENTERO_LARGO):
+            valores = serie.astype("Int64" if tipo == ENTERO_LARGO else "Int32")  # admite vacíos
         else:
             valores = serie.to_numpy()
         columnas[col] = pa.array(valores, type=tipos[tipo], from_pandas=True)
     return pa.table(columnas)
 
 
+def copiar(cur, nombre, df, esquema):
+    """Carga masiva de un DataFrame en stg.<nombre>, comprobando que llegan todas las filas."""
+    if not len(df):
+        return
+    res = cur.bulkcopy_arrow(f"stg.{nombre}", a_arrow(df, esquema), timeout=600,
+                             column_mappings=list(esquema), keep_nulls=True, table_lock=True)
+    if res["rows_copied"] != len(df):
+        raise bd.ErrorBD(f"stg.{nombre}: copiadas {res['rows_copied']} de {len(df)} filas")
+
+
+def filas(cur):
+    columnas = [c[0] for c in cur.description]
+    return [dict(zip(columnas, fila)) for fila in cur.fetchall()]
+
+
+def leer_reglas(cur):
+    """Reglas activas y empresas que sigue cada cliente (la Function las ve todas: rol_carga)."""
+    cur.execute("SELECT regla_id, cliente_id, tipo, CAST(umbral AS FLOAT) AS umbral, ambito "
+                "FROM cliente.regla_alerta WHERE activa = 1")
+    reglas = pd.DataFrame(filas(cur), columns=["regla_id", "cliente_id", "tipo", "umbral", "ambito"])
+    cur.execute("SELECT ce.cliente_id, e.lei, ce.rol FROM cliente.cliente_emisor AS ce "
+                "JOIN dw.dim_emisor AS e ON e.emisor_id = ce.emisor_id")
+    seguimiento = pd.DataFrame(filas(cur), columns=["cliente_id", "lei", "rol"])
+    return reglas, seguimiento
+
+
+def cargar_alertas(cur, tablas):
+    """Evalúa las reglas de todos los clientes y carga cliente.alerta. Devuelve (resumen, nuevas recientes)."""
+    reglas, seguimiento = leer_reglas(cur)
+    nombres = tablas["dim_emisor"].set_index("lei")["nombre"]
+    alertas = reglas_alerta.evaluar(tablas["indicador_diario"], tablas["fondo_nuevo"], tablas["posicion_diaria"],
+                                    reglas, seguimiento, nombres)
+    copiar(cur, "alerta", alertas, ESQUEMA_ALERTA)
+    cur.execute("EXEC cliente.usp_cargar_alertas")
+    resumen = filas(cur)[0]
+    recientes = filas(cur) if cur.nextset() else []
+    resumen["reglas"] = len(reglas)
+    return resumen, recientes
+
+
 def cargar_bd(tablas, clave, conexion=None):
-    """Copia las tablas gold en stg y ejecuta dw.usp_cargar. Devuelve la fila de dw.carga."""
+    """Copia las tablas gold en stg, ejecuta dw.usp_cargar y genera las alertas. Devuelve el resultado."""
     import mssql_python
 
     propia = conexion is None
@@ -72,14 +123,16 @@ def cargar_bd(tablas, clave, conexion=None):
         cur = cx.cursor()
         cur.execute("EXEC stg.usp_vaciar")
         for nombre, esquema in ESQUEMA_STG.items():
-            res = cur.bulkcopy_arrow(f"stg.{nombre}", a_arrow(tablas[nombre], esquema), timeout=600,
-                                     column_mappings=list(esquema), keep_nulls=True, table_lock=True)
-            if res["rows_copied"] != len(tablas[nombre]):
-                raise bd.ErrorBD(f"stg.{nombre}: copiadas {res['rows_copied']} de {len(tablas[nombre])} filas")
+            copiar(cur, nombre, tablas[nombre], esquema)
         cur.execute("EXEC dw.usp_cargar @origen_bronze = ?, @version_reglas = ?, @version_modelo = ?",
                     (clave["origen_bronze"], clave["version_reglas"], clave["version_modelo"]))
-        columnas = [c[0] for c in cur.description]
-        return dict(zip(columnas, cur.fetchone()))
+        carga = filas(cur)[0]
+        resumen, recientes = cargar_alertas(cur, tablas)
+        for alerta in recientes:
+            # En producción, aquí se enviaría el correo al cliente
+            logging.info("ALERTA_CLIENTE cliente=%s %s", alerta["cliente_id"], alerta["mensaje"])
+        carga["alertas"] = resumen
+        return carga
     except mssql_python.Error as e:
         raise bd.ErrorBD(f"Carga en Azure SQL fallida: {e}") from e
     finally:
@@ -107,7 +160,16 @@ def preparar(almacen_silver, ahora):
     tabla_precios = precios.leer(almacen_silver)
     if tabla_precios is None:
         raise precios.ErrorPrecios("No hay precios guardados y la descarga de Yahoo ha fallado")
-    tablas, informe = gold.construir(leer_silver(almacen_silver), tabla_precios, ahora.date())
+    acciones = precios.leer_acciones(almacen_silver)
+    silver_cnmv = leer_silver(almacen_silver)
+    sin_ticker = sorted(set(silver_cnmv["emisores"]["lei"]) - set(precios.tabla_tickers()["lei"]))
+    if sin_ticker:
+        # Emisor nuevo en la CNMV: hay que añadir su código de Yahoo a src/modelo/tickers.csv
+        nombres = silver_cnmv["emisores"].set_index("lei")["emisor"]
+        logging.warning("INGESTA_CNMV_REVISAR Emisores sin código de Yahoo en tickers.csv: %s",
+                        json.dumps({lei: nombres[lei] for lei in sin_ticker}, ensure_ascii=False))
+    tablas, informe = gold.construir(silver_cnmv, tabla_precios, ahora.date(), acciones)
+    informe["emisores_sin_ticker"] = sin_ticker
     informe["precios"] = informe_precios or {"aviso": "no actualizados en esta carga"}
     return tablas, informe
 

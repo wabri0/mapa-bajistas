@@ -25,6 +25,7 @@ GRANT SELECT ON cliente.dim_cliente TO rol_cliente;
 GRANT SELECT ON cliente.cliente_emisor TO rol_cliente;
 GRANT SELECT ON cliente.alerta TO rol_cliente;
 GRANT SELECT, INSERT, UPDATE, DELETE ON cliente.nota TO rol_cliente;
+GRANT SELECT ON cliente.regla_alerta TO rol_cliente;  -- ve sus reglas; las cambia la consultora
 
 GRANT SELECT ON SCHEMA::dw TO rol_consultora;
 GRANT SELECT, INSERT, UPDATE, DELETE ON SCHEMA::cliente TO rol_consultora;
@@ -36,6 +37,8 @@ GRANT EXECUTE ON OBJECT::dw.usp_cargar TO rol_carga;
 GRANT SELECT ON cliente.dim_cliente TO rol_carga;
 GRANT SELECT ON cliente.cliente_emisor TO rol_carga;
 GRANT SELECT, INSERT, DELETE ON cliente.alerta TO rol_carga;
+GRANT SELECT ON cliente.regla_alerta TO rol_carga;
+GRANT EXECUTE ON OBJECT::cliente.usp_cargar_alertas TO rol_carga;
 GO
 
 /* --- Seguridad por filas --- */
@@ -62,6 +65,9 @@ GO
 CREATE SECURITY POLICY seguridad.politica_cliente
     ADD FILTER PREDICATE seguridad.fn_cliente_visible(cliente_id) ON cliente.dim_cliente,
     ADD FILTER PREDICATE seguridad.fn_cliente_visible(cliente_id) ON cliente.cliente_emisor,
+    ADD FILTER PREDICATE seguridad.fn_cliente_visible(cliente_id) ON cliente.regla_alerta,
+    ADD BLOCK  PREDICATE seguridad.fn_cliente_visible(cliente_id) ON cliente.regla_alerta AFTER INSERT,
+    ADD BLOCK  PREDICATE seguridad.fn_cliente_visible(cliente_id) ON cliente.regla_alerta AFTER UPDATE,
     ADD FILTER PREDICATE seguridad.fn_cliente_visible(cliente_id) ON cliente.alerta,
     ADD BLOCK  PREDICATE seguridad.fn_cliente_visible(cliente_id) ON cliente.alerta AFTER INSERT,
     ADD FILTER PREDICATE seguridad.fn_cliente_visible(cliente_id) ON cliente.nota,

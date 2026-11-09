@@ -3,19 +3,22 @@
    ---------------------------------------------------------------------
    El administrador se hace pasar por cada usuario de prueba (EXECUTE AS) y
    cuenta lo que ve. Resultado esperado:
-     demo_cliente_a   1 cliente, 4 empresas seguidas, solo sus notas
-     demo_cliente_b   1 cliente, 4 empresas seguidas, solo sus notas
-     demo_consultora  todos los clientes y todas las notas
+     demo_cliente_a   1 cliente, 4 empresas seguidas, solo sus notas, reglas y alertas
+     demo_cliente_b   1 cliente, 4 empresas seguidas, solo sus notas, reglas y alertas
+     demo_consultora  todos los clientes, notas, reglas y alertas
    Las tablas públicas (dw) se ven enteras con cualquier usuario.
    ===================================================================== */
 
 CREATE TABLE #resultado (usuario SYSNAME, clientes INT, empresas_seguidas INT, notas INT,
-                         notas_de_otros INT, posiciones_publicas INT);
+                         notas_de_otros INT, reglas INT, alertas INT, alertas_de_otros INT,
+                         posiciones_publicas INT);
 
 EXECUTE AS USER = 'demo_cliente_a';
 INSERT #resultado
 SELECT USER_NAME(), (SELECT COUNT(*) FROM cliente.dim_cliente), (SELECT COUNT(*) FROM cliente.cliente_emisor),
        (SELECT COUNT(*) FROM cliente.nota), (SELECT COUNT(*) FROM cliente.nota WHERE cliente_id <> 1),
+       (SELECT COUNT(*) FROM cliente.regla_alerta), (SELECT COUNT(*) FROM cliente.alerta),
+       (SELECT COUNT(*) FROM cliente.alerta WHERE cliente_id <> 1),
        (SELECT COUNT(*) FROM dw.fact_posicion_diaria);
 REVERT;
 
@@ -23,13 +26,16 @@ EXECUTE AS USER = 'demo_cliente_b';
 INSERT #resultado
 SELECT USER_NAME(), (SELECT COUNT(*) FROM cliente.dim_cliente), (SELECT COUNT(*) FROM cliente.cliente_emisor),
        (SELECT COUNT(*) FROM cliente.nota), (SELECT COUNT(*) FROM cliente.nota WHERE cliente_id <> 2),
+       (SELECT COUNT(*) FROM cliente.regla_alerta), (SELECT COUNT(*) FROM cliente.alerta),
+       (SELECT COUNT(*) FROM cliente.alerta WHERE cliente_id <> 2),
        (SELECT COUNT(*) FROM dw.fact_posicion_diaria);
 REVERT;
 
 EXECUTE AS USER = 'demo_consultora';
 INSERT #resultado
 SELECT USER_NAME(), (SELECT COUNT(*) FROM cliente.dim_cliente), (SELECT COUNT(*) FROM cliente.cliente_emisor),
-       (SELECT COUNT(*) FROM cliente.nota), NULL, (SELECT COUNT(*) FROM dw.fact_posicion_diaria);
+       (SELECT COUNT(*) FROM cliente.nota), NULL, (SELECT COUNT(*) FROM cliente.regla_alerta),
+       (SELECT COUNT(*) FROM cliente.alerta), NULL, (SELECT COUNT(*) FROM dw.fact_posicion_diaria);
 REVERT;
 
 SELECT * FROM #resultado;

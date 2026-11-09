@@ -100,7 +100,7 @@ def test_construir_quita_festivos_y_el_indice(silver_minima, precios_minimos, mo
     assert informe["precios_fuera_de_bolsa_eliminados"] == 1
     em = tablas["dim_emisor"].iloc[0]
     assert em["ticker"] == "AAA.MC" and em["tiene_precios"]
-    assert set(tablas) == set(cargar.ESQUEMA_STG)
+    assert set(tablas) == set(cargar.ESQUEMA_STG) | {"fondo_nuevo"}  # fondo_nuevo: solo para las reglas
 
 
 def test_tablas_gold_tienen_las_columnas_de_stg(silver_minima, precios_minimos, monkeypatch):
@@ -140,6 +140,7 @@ def test_precio_del_dia_solo_tras_el_cierre(tmp_path, monkeypatch):
     tickers = precios.tabla_tickers()
     filas = [(d, t, 1.0, 100) for d in ["2026-11-06", "2026-11-09"] for t in [*tickers["ticker"], "^IBEX"]]
     monkeypatch.setattr(precios, "descargar", lambda _: tabla_precios(filas).drop(columns="lei"))
+    monkeypatch.setattr(precios, "descargar_acciones", lambda _: pd.DataFrame({"ticker": ["AAA.MC"], "acciones": [1000]}))
     almacen = AlmacenLocal(tmp_path)
     precios.actualizar(almacen, datetime(2026, 11, 9, 12, tzinfo=timezone.utc))
     assert precios.leer(almacen)["fecha"].max() == pd.Timestamp("2026-11-06")
@@ -208,3 +209,13 @@ def test_scripts_sql_se_pueden_repetir(script):
             assert "DROP SECURITY POLICY IF EXISTS" in texto[:m.start()], f"{script}: política sin DROP previo"
         else:
             assert "IS NULL" in texto[max(0, m.start() - 120):m.start()], f"{script}: {m.group(0)} sin protección"
+
+
+def test_avisa_de_emisores_sin_codigo_de_yahoo(tmp_path, silver_minima, precios_minimos, monkeypatch, caplog):
+    almacen = preparar_silver(tmp_path, silver_minima)
+    almacen.escribir_bytes("yahoo/precios.parquet", cargar.silver.a_parquet(precios_minimos))
+    monkeypatch.setattr(precios, "actualizar", lambda *a: None)
+    monkeypatch.setattr(precios, "tabla_tickers", lambda: pd.DataFrame({"lei": [LEI_B], "ticker": ["BBB.MC"]}))
+    estado = cargar.ejecutar(almacen, cargar=False, ahora=datetime(2024, 4, 2, 20, tzinfo=timezone.utc))
+    assert estado["informe"]["emisores_sin_ticker"] == [LEI_A]
+    assert "INGESTA_CNMV_REVISAR Emisores sin código de Yahoo" in caplog.text
