@@ -6,3 +6,5 @@ requests>=2.32
 xlrd>=2.0
 pandas>=2.2
 pyarrow>=21
+yfinance>=1.8
+mssql-python>=1.17
