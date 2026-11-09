@@ -2,7 +2,7 @@
 
 Trabajo final (Track B, arquitectura técnica): plataforma en Azure que sigue a diario las posiciones cortas netas que publica la CNMV, las cruza con la cotización y avisa a cada cliente (cotizadas atendidas por una consultora de relación con inversores), con los datos de cada cliente aislados. Entrega: 10-ene-2027. El plan por fases está en [docs/planning.md](docs/planning.md); el usuario pide «procede con la fase N».
 
-## Estado (actualizado el 8-nov-2026)
+## Estado (actualizado el 9-nov-2026)
 
 | Fase | Estado |
 | --- | --- |
@@ -18,9 +18,9 @@ Trabajo final (Track B, arquitectura técnica): plataforma en Azure que sigue a 
 - **Diseño aprobado del modelo en estrella** (explicado para el usuario en la página https://claude.ai/artifact/7r2TrcDoE17AuUYroYqGrv):
   - Esquema `dw` (público): `dim_fecha` (calendario de bolsa a partir de los días con cotización de `^IBEX`), `dim_emisor`, `dim_fondo`, `fact_posicion_diaria` (sin festivos), `fact_precio_diario`, `fact_notificacion`.
   - Esquema `cliente` (confidencial, con RLS): `dim_cliente`, `cliente_emisor`, `alerta` (se llena en la fase 4), `nota`, `usuario_cliente` (usuario → cliente; la consultora tiene un rol que lo ve todo). Dos clientes ficticios para la demo.
-- **Decisiones para Azure SQL:** oferta gratuita de Azure SQL Database (se pausa al agotarse, nunca cobra), France Central, **solo autenticación Microsoft Entra (sin contraseñas)** con el usuario como administrador, firewall con la IP del usuario más los servicios de Azure (en producción, red privada). Conector de Python: **`mssql-python`** (funciona con Python 3.14 y no necesita ODBC; en local solo está el driver ODBC antiguo «SQL Server»). Precios con `yfinance` (instalado en `.venv`; aún no está en `requirements.txt`).
-- **Siguiente paso:** preparar en el portal el formulario de la base de datos para que el usuario pulse «Crear»; después, desde el editor de consultas del portal, crear el usuario de la identidad de la Function (`CREATE USER [func-mapa-bajistas] FROM EXTERNAL PROVIDER`) y sus permisos. Luego: `src/modelo/` (precios y carga de gold), scripts en `sql/` (esquema y RLS), pruebas, carga diaria en la Function y sección del informe.
-- Pendiente menor de la fase 2: los festivos de bolsa se resuelven aquí con `dim_fecha`.
+- **Decisiones para Azure SQL:** oferta gratuita de Azure SQL Database (se pausa al agotarse, nunca cobra), France Central, **solo autenticación Microsoft Entra (sin contraseñas)** con el usuario como administrador, firewall con la IP del usuario más los servicios de Azure (en producción, red privada). Nombres previstos: servidor `sql-mapa-bajistas`, base `sqldb-mapa-bajistas`. Conector: **`mssql-python`** (trae su propio driver, también para Linux; carga masiva con `bulkcopy_arrow`).
+- **Código hecho y desplegado (9-nov, commit 18610fa, 53 pruebas):** `src/modelo/precios.py` (yfinance, descarga completa en 6 s → `silver/yahoo/precios.parquet`; el dato del día solo tras las 17 UTC; si Yahoo falla, aviso `INGESTA_CNMV_REVISAR` y precios anteriores), `gold.py` (día de bolsa = IBEX o ≥ 10 acciones con volumen, porque a Yahoo le faltan el IBEX del 2-ene-2012 y 2-ene-2017 e inventa el 25-dic-2019; días futuros con regla de festivos, que coincide con los datos salvo 24 y 31-dic de 2010 y 2021, sin datos en Yahoo; quita 4.245 posiciones en 82 festivos), `bd.py` (identidad administrada en Azure; en local, navegador una vez y sesión guardada en `~/.mapa_bajistas`), `cargar.py` (stg → `dw.usp_cargar` en una transacción; estado en `silver/gold/estado.json` para no despertar la base cada hora). Scripts `sql/01`–`06` (esquema, carga, roles+RLS, clientes demo A/Grifols y B/Solaria, usuario de la Function, prueba RLS). La Function carga la gold solo si existe `SQL_SERVIDOR`.
+- **Siguiente paso (bloqueado el 9-nov porque la extensión de Chrome no estaba conectada):** 1) crear el servidor y la base en el portal (el usuario pulsa «Crear»); 2) en local: `python -m src.modelo.bd sql/01_esquema.sql sql/02_carga.sql sql/03_seguridad.sql sql/05_usuario_function.sql`, luego `python -m src.modelo.cargar --forzar` (primera carga; comprobar que `bulkcopy_arrow` acepta los tipos), luego `sql/04_clientes_demo.sql` y `sql/06_prueba_rls.sql`; 3) en la Function: variables `SQL_SERVIDOR` y `SQL_BASE_DATOS`, y **memoria de instancia a 2048 MB** (pico local de 350 MB con silver + gold; el coste sigue dentro de la cuota gratuita); 4) comprobar `GOLD_CARGA_OK` en Application Insights; 5) sección 4.3 del informe, README y este fichero.
 
 ## Arquitectura (prototipo)
 
@@ -54,7 +54,8 @@ Despliegue: push a main → GitHub Actions (descarga el Excel actual, pruebas, e
 python -m venv .venv && .venv/Scripts/pip install -r requirements.txt -r requirements-dev.txt yfinance mssql-python
 .venv/Scripts/python -m src.ingesta.ejecutar    # descarga el Excel a data/raw/cnmv/...
 .venv/Scripts/python -m src.limpieza.silver     # construye data/silver/cnmv/
-.venv/Scripts/python -m pytest -q               # 27 pruebas (las de datos reales usan el Excel más reciente de data/raw)
+.venv/Scripts/python -m src.modelo.cargar --sin-bd # precios y tablas gold sin cargar en SQL
+.venv/Scripts/python -m pytest -q               # 53 pruebas (las de datos reales usan el Excel más reciente de data/raw)
 ```
 
 Si la carpeta del proyecto cambia de sitio, el `.venv` deja de funcionar: hay que borrarlo y volver a crearlo con la primera línea.
