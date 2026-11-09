@@ -14,7 +14,7 @@ Proyecto final · Track B (Arquitectura técnica) · Entrega: 10-ene-2027. Plann
 | `src/ingesta/` | Descarga, validación y guardado del Excel en bronze (fase 1) |
 | `src/limpieza/` | Limpieza, grupos gestores y posiciones diarias: capa silver (fase 2) |
 | `src/modelo/` | Precios de Yahoo, modelo en estrella (gold) y carga en Azure SQL (fase 3) |
-| `src/alertas/` | Indicadores y reglas de alerta (fase 4) |
+| `src/alertas/` | Indicadores diarios y reglas de alerta por cliente (fase 4) |
 | `function_app.py`, `host.json` | Azure Function que lanza la ingesta (la raíz del repo es la app) |
 | `sql/` | Esquema, procedimientos de carga, roles y seguridad por filas (RLS), clientes de demo y pruebas |
 | `powerbi/` | Panel de Power BI (fase 5) |
@@ -41,7 +41,7 @@ Servidor `sql-mapa-bajistas.database.windows.net`, base `sqldb-mapa-bajistas`, s
 ```
 .venv/Scripts/python -m src.modelo.bd sql/01_esquema.sql sql/02_carga.sql sql/03_seguridad.sql sql/05_usuario_function.sql
 .venv/Scripts/python -m src.modelo.cargar --forzar        # carga la gold desde data/silver
-.venv/Scripts/python -m src.modelo.bd sql/04_clientes_demo.sql sql/06_prueba_rls.sql
+.venv/Scripts/python -m src.modelo.bd sql/04_clientes_demo.sql sql/07_reglas_demo.sql sql/06_prueba_rls.sql
 ```
 
 ## Fuente de los datos

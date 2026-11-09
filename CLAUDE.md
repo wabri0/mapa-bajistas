@@ -10,14 +10,24 @@ Trabajo final (Track B, arquitectura técnica): plataforma en Azure que sigue a 
 | 1 · Ingesta diaria (bronze) | Hecha y en producción |
 | 2 · Limpieza (silver) | Hecha y en producción, verificada en Azure |
 | 3 · Base de datos SQL, precios, clientes y RLS | Hecha y en producción (9-nov): la Function carga Azure SQL sola |
-| 4–7 | Pendientes (ver planning) |
+| 4 · Indicadores y alertas | Hecha y en producción (9-nov) |
+| 5–7 | Pendientes (ver planning). Siguiente: fase 5, panel en Power BI |
 
 ## Fase 3: resumen (hecha)
 
 - **Azure SQL** (oferta gratuita, cobro por exceso desactivado, France Central): servidor `sql-mapa-bajistas`, base `sqldb-mapa-bajistas`, solo Entra (admin `ggomeama@myuax.com`), firewall con servicios de Azure e IP 81.43.33.72 (si cambia la IP del usuario, hay que añadirla en el portal). Usuario `[func-mapa-bajistas]` con `rol_carga`. Function con `SQL_SERVIDOR`, `SQL_BASE_DATOS` y **2048 MB**.
 - **Código:** `src/modelo/precios.py` (yfinance, descarga completa en 6 s → `silver/yahoo/precios.parquet`; dato del día solo tras las 17 UTC; si Yahoo falla, aviso `INGESTA_CNMV_REVISAR` y precios anteriores), `gold.py` (día de bolsa = IBEX o ≥ 10 acciones con volumen; futuros con regla de festivos), `bd.py` (identidad administrada en Azure; en local, navegador una vez y sesión en `~/.mapa_bajistas`), `cargar.py` (stg → `dw.usp_cargar` en una transacción; estado en `silver/gold/estado.json` para no despertar la base cada hora). Scripts `sql/01`–`06`. Subir `VERSION_MODELO` en `gold.py` si cambia el modelo (fuerza la recarga).
 - **Verificado:** primera carga local en 25 s (215.680 posiciones, 279.625 precios, 12.370 notificaciones); carga automática de la Function el 9-nov a las 19:00 UTC (`dw.carga` id 2, fichero del 6-nov). RLS probada con `demo_cliente_a` (Grifols), `demo_cliente_b` (Solaria) y `demo_consultora`. Cifras de Grifols y Solaria iguales desde SQL. Sección del informe: `docs/informe/04_arquitectura.md` §4.2.
-- **Siguiente:** fase 4 (indicadores y alertas en `cliente.alerta`).
+
+## Fase 4: resumen (hecha)
+
+- `src/alertas/indicadores.py`: por emisor y sesión de bolsa, suma, fondos, fondos nuevos (sin posición en las 20 sesiones previas), salidas, variación a 5 y 20 sesiones, peso del mayor fondo, precio y días para cubrir (acciones en circulación **actuales** de Yahoo, porque su histórico tiene errores de x1000; volumen solo de Madrid). Se carga en `dw.fact_indicador_diario`.
+- `src/alertas/reglas.py`: 6 tipos (`fondo_nuevo`, `suma_supera`, `suma_sube_5d`, `suma_sube_20d`, `fondos_supera`, `dias_cubrir_supera`); los de umbral solo avisan al cruzarlo. Reglas en `cliente.regla_alerta` (RLS; las cambia la consultora en SQL; se aplican en la siguiente carga). Demo en `sql/07_reglas_demo.sql`: A (Grifols, sensible) y B (Solaria, solo movimientos grandes).
+- Alertas sobre todo el histórico: 73 (A 53, B 20). `cliente.usp_cargar_alertas` hace MERGE sin duplicar; el envío por correo queda para producción (columna `enviada_utc`, log `ALERTA_CLIENTE`).
+- Hallazgo pendiente de confirmar con fuente: el 8-ene-2024 entra en Grifols **General Industrial Partners LLP** (0,57 %; 0,06 % al día siguiente); posiblemente vinculada a Gotham City Research. No darlo por hecho en el informe hasta verificarlo.
+- Emisor nuevo sin código de Yahoo → aviso `INGESTA_CNMV_REVISAR` (pasó con Puig Brands, añadido como `PUIG.MC`).
+- Verificado en Azure el 9-nov (19:21 UTC, ejecución manual). Informe: `docs/informe/04_arquitectura.md` §4.3. 73 pruebas.
+- La extensión de Chrome se desconecta a veces: si falla, pedir al usuario que abra Chrome.
 
 ## Arquitectura (prototipo)
 
@@ -54,7 +64,7 @@ python -m venv .venv && .venv/Scripts/pip install -r requirements.txt -r require
 .venv/Scripts/python -m src.limpieza.silver     # construye data/silver/cnmv/
 .venv/Scripts/python -m src.modelo.cargar --sin-bd # precios y tablas gold sin cargar en SQL (--forzar: carga en Azure SQL)
 .venv/Scripts/python -m src.modelo.bd sql/06_prueba_rls.sql  # ejecuta scripts en Azure SQL (abre el navegador la primera vez)
-.venv/Scripts/python -m pytest -q               # 53 pruebas (las de datos reales usan el Excel más reciente de data/raw)
+.venv/Scripts/python -m pytest -q               # 73 pruebas (las de datos reales usan el Excel más reciente de data/raw)
 ```
 
 Si la carpeta del proyecto cambia de sitio, el `.venv` deja de funcionar: hay que borrarlo y volver a crearlo con la primera línea.

@@ -1,6 +1,6 @@
 # 4. Arquitectura propuesta
 
-> Borrador por fases. Fase 1 (ingesta y capa bronze) escrita el 3-nov-2026; fase 3 (base de datos gold) el 9-nov-2026. La limpieza de la fase 2 está en la sección 3.2; las fases 4 y 5 añadirán sus apartados.
+> Borrador por fases. Fase 1 (ingesta y capa bronze) escrita el 3-nov-2026; fases 3 (base de datos gold) y 4 (indicadores y alertas) el 9-nov-2026. La limpieza de la fase 2 está en la sección 3.2; la fase 5 añadirá su apartado.
 
 ## 4.1 Ingesta diaria y capa bronze (fase 1)
 
@@ -129,3 +129,80 @@ Solaria también cuadra: 16,06 % con 18 fondos el 19-dic-2024.
 - Los scripts SQL se pueden ejecutar varias veces.
 
 Los errores de carga se registran como `INGESTA_CNMV_FALLO`, así que la alerta por correo existente también los cubre.
+
+## 4.3 Indicadores y alertas por cliente (fase 4)
+
+**Qué hace.** En cada carga, la Function calcula seis indicadores diarios por empresa. Después evalúa las reglas que cada cliente tiene guardadas en la base de datos y registra sus alertas en `cliente.alerta`. Esa tabla está protegida con la misma seguridad por filas que el resto de datos de clientes.
+
+**Indicadores** (`dw.fact_indicador_diario`, 93.372 filas con el fichero de la CNMV del 6-nov-2026). Hay una fila por empresa y día de bolsa con posiciones, más las 20 sesiones siguientes para registrar la salida. Las variaciones se cuentan en sesiones de bolsa, no en días naturales.
+
+| Indicador | Cálculo | Para qué sirve |
+| --- | --- | --- |
+| Suma de posiciones cortas | Suma de los % publicados ese día | Presión bajista total |
+| Número de bajistas | Fondos con posición ≥ 0,5 % | Si el ataque es de uno o de muchos |
+| Fondos nuevos y salidas | Un fondo es nuevo si no tenía posición en las 20 sesiones anteriores. Así no cuenta como entrada el que baja un día del 0,5 % y vuelve | Detectar la llegada de un bajista |
+| Variación a 5 y 20 sesiones | Suma de hoy menos la de hace 5 o 20 sesiones, en puntos | Velocidad del ataque |
+| Concentración | Peso del mayor fondo en la suma (%) | Si depende de un solo fondo |
+| Días para cubrir | Acciones en corto (suma × acciones en circulación) / volumen medio de 20 sesiones | Cuánto tardarían los bajistas en recomprar: riesgo de subida brusca si se ven obligados |
+
+El cálculo tarda menos de un segundo para todo el histórico.
+
+**Limitaciones de «días para cubrir».**
+- Usa las acciones en circulación **actuales**. El histórico de Yahoo no es fiable: tiene saltos de mil veces, como Duro Felguera con 58.000 millones de acciones durante dos años. En fechas antiguas de empresas que cambiaron su capital, el dato es aproximado. Para las alertas, que miran los últimos días, sí es fiable.
+- El volumen es solo el de la Bolsa de Madrid. No incluye otras plataformas (Cboe, Turquoise), así que la liquidez real es mayor y los días reales para cubrir, menos.
+
+**Reglas por cliente** (`cliente.regla_alerta`). Hay seis tipos: fondo nuevo, la suma supera un %, la suma sube X puntos en 5 o en 20 sesiones, el número de fondos supera N y los días para cubrir superan N. Cada regla se aplica a la empresa propia del cliente, a sus competidoras o a ambas.
+
+Las reglas de umbral solo avisan **el día en que se cruza el umbral**, no todos los días que siga por encima, para no repetir el mismo aviso cada mañana. La consultora cambia las reglas en la base de datos sin tocar el código. Cada cliente puede leer sus reglas, pero no las de otro.
+
+| Cliente de demostración | Perfil | Reglas |
+| --- | --- | --- |
+| A, farmacéutica (sigue a Grifols, Almirall, Rovi y Faes) | Quiere enterarse pronto | Cualquier fondo nuevo; subida de 0,5 puntos en 5 sesiones; suma > 2 %. En competidoras, subida de 1 punto en 20 sesiones |
+| B, renovables (sigue a Solaria, Grenergy, Acciona Energía y Soltec) | Convive con muchos cortos; solo quiere lo grande | Subida de 1,5 puntos en 20 sesiones; 15 fondos o más; más de 20 sesiones para cubrir. En competidoras, suma > 5 % |
+
+**Resultado sobre el histórico (2010 a nov-2026).** Las reglas se evalúan sobre todos los datos, así que se ve qué habría recibido cada cliente.
+
+| Cliente | Alertas | De ellas en 2024 | Desglose |
+| --- | --- | --- | --- |
+| A | 53 | 12 | 23 fondos nuevos, 22 subidas en 5 sesiones, 7 cruces del 2 %, 1 en competidoras |
+| B | 20 | 10 | 9 subidas en 20 sesiones, 10 de días para cubrir, 1 de 15 fondos |
+
+De media, unas 3 alertas al año para el cliente A y menos de 2 para el B, concentradas en los años de crisis (12 y 10 en 2024). Es un volumen que un equipo de relación con inversores puede atender.
+
+**Caso Grifols con las reglas del cliente A.**
+1. **8-ene-2024, víspera del informe de Gotham:** entra General Industrial Partners LLP con un 0,57 %, la suma pasa del 1,62 % al 2,19 % y saltan tres alertas a la vez: fondo nuevo, subida de 0,57 puntos en 5 sesiones y suma por encima del 2 %. Al día siguiente esa posición baja al 0,06 %. (Pendiente de confirmar con una fuente si esta entidad está vinculada a Gotham City Research antes de usarlo en la presentación.)
+2. **29-ene:** entra Qube Research & Technologies (0,50 %).
+3. **9-feb:** la suma sube 0,58 puntos en 5 sesiones, hasta el 2,91 %.
+4. **6-mar:** entra Marshall Wace, y la suma llega al 3,79 % con 5 fondos.
+
+Como la CNMV publica cada posición con al menos un día de retraso, la alerta llega con la publicación, no antes. La Function lo detecta la misma tarde en que aparece el fichero.
+
+**Caso Solaria con las reglas del cliente B.**
+- **2024:** los días para cubrir superan 20 sesiones en julio y octubre.
+- **1-nov y 20-nov-2024:** la suma sube más de 1,5 puntos en 20 sesiones.
+- **19-nov-2024:** se llega a 15 fondos.
+- **19-dic-2024:** se alcanza el máximo de 16,06 % con 18 fondos.
+
+**Carga y aislamiento.**
+1. Python evalúa las reglas y deja las alertas en `stg.alerta`.
+2. `cliente.usp_cargar_alertas` las incorpora con un `MERGE`, sin duplicar las que ya existían. Repetir la carga da 0 alertas nuevas. Si se cambia una regla, las alertas que ya no salen se borran, salvo las ya enviadas.
+3. La prueba de seguridad (`sql/06_prueba_rls.sql`) da:
+   - `demo_cliente_a`: 4 reglas y 53 alertas, ninguna de otro cliente.
+   - `demo_cliente_b`: 4 reglas y 20 alertas, ninguna de otro cliente.
+   - `demo_consultora`: las 8 reglas y las 73 alertas.
+
+**Prueba en la nube (9-nov-2026, 19:21 UTC).** Ejecución manual de la Function con el fichero publicado ese día: 216.168 posiciones, 93.408 filas de indicadores y las mismas 73 alertas, ninguna duplicada. Queda comprobado que la identidad de la Function tiene los permisos justos para leer las reglas y escribir las alertas.
+
+**Envío.** El prototipo registra las alertas en la tabla, que mostrará el panel de la fase 5, y deja en Application Insights una línea `ALERTA_CLIENTE` por cada alerta nueva de los últimos 10 días. La tabla tiene la columna `enviada_utc` para el envío por correo en producción, que se diseñará y presupuestará en la fase 6 (por ejemplo, con Azure Communication Services Email).
+
+**Mantenimiento.** Cuando aparece en la CNMV una empresa nueva sin código de Yahoo, la Function avisa con `INGESTA_CNMV_REVISAR`. Así ocurrió con **Puig Brands**, primera posición corta el 4-nov-2026, que se añadió a `tickers.csv` (`PUIG.MC`).
+
+**Calidad.** 20 pruebas nuevas, 73 en total:
+- Cálculo de cada indicador con casos pequeños hechos a mano.
+- Fondo que vuelve antes de 20 sesiones (no es nuevo).
+- Festivos.
+- Aviso solo al cruzar el umbral.
+- Separación de clientes y ámbito de competidoras.
+- Nombres de empresa en los mensajes.
+- Tipos de regla iguales en Python y en SQL.
+- Aviso de emisor sin código.
