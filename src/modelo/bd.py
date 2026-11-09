@@ -58,7 +58,7 @@ def credencial():
 def conectar(servidor=None, base_datos=None, autocommit=True):
     import mssql_python
 
-    servidor = servidor or os.environ["SQL_SERVIDOR"]
+    servidor = servidor or os.environ.get("SQL_SERVIDOR", "sql-mapa-bajistas.database.windows.net")
     base_datos = base_datos or os.environ.get("SQL_BASE_DATOS", "sqldb-mapa-bajistas")
     cadena = (f"Server=tcp:{servidor},1433;Database={base_datos};Encrypt=yes;"
               "TrustServerCertificate=no;")
@@ -105,6 +105,7 @@ def main():
     p.add_argument("--base-datos", default=os.environ.get("SQL_BASE_DATOS", "sqldb-mapa-bajistas"))
     args = p.parse_args()
     logging.basicConfig(level=logging.INFO, format="%(levelname)s %(message)s")
+    logging.getLogger("azure").setLevel(logging.WARNING)
     with conectar(args.servidor, args.base_datos) as conexion:
         for ruta in args.scripts:
             resultados = ejecutar_script(conexion, ruta)

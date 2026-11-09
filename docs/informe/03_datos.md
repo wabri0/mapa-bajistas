@@ -59,7 +59,7 @@ Si falla algún control crítico (LEI, porcentajes, fechas o cuadre), la silver 
 ## 3.3 Fuentes complementarias
 
 - **Operaciones de directivos y participaciones significativas:** registros públicos de la CNMV. Se consultan por emisor y se tratan en fases posteriores.
-- **Cotización y volumen:** yfinance, solo para el prototipo académico. En producción haría falta un proveedor con licencia comercial (ver sección 9).
+- **Cotización y volumen:** yfinance, solo para el prototipo académico. En producción haría falta un proveedor con licencia comercial (ver sección 9). La tabla `src/modelo/tickers.csv` asigna a cada emisor su código de la Bolsa de Madrid (71 por búsqueda de ISIN, 9 a mano). Hay precios para 76 de 80 códigos; los 4 sin datos son empresas absorbidas o excluidas de bolsa (Axiare, Liberbank, NH Hotel Group, Quabit), y de Ercros Yahoo solo tiene un día. Los precios también sirven para construir el calendario de bolsa (sección 4.2).
 
 ## 3.4 Condiciones legales de uso
 
