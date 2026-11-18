@@ -197,6 +197,49 @@ def test_lotes_separados_por_go():
     assert bd.lotes(texto) == ["SELECT 1;", "SELECT 'GOTHAM';", "SELECT 2"]
 
 
+# ---------- Conexión: base de datos en pausa ----------
+
+# Mensaje real de mssql-python en Application Insights (10-18 nov 2026): no trae el número 40613
+REANUDANDO = ("Driver Error: General error; DDBC Error: [Microsoft][SQL Server]Database 'sqldb-mapa-bajistas' "
+              "on server 'sql-mapa-bajistas.database.windows.net' is not currently available. Please retry "
+              "the connection later.")
+
+
+def test_error_de_base_en_pausa_se_reintenta():
+    assert bd.reintentable(REANUDANDO)
+    assert not bd.reintentable("Driver Error: Login failed for user '<token-identified principal>'")
+
+
+def test_conectar_reintenta_mientras_la_base_se_reanuda(monkeypatch):
+    import mssql_python
+
+    intentos = []
+
+    def conectar_falso(*args, **kwargs):
+        intentos.append(1)
+        if len(intentos) < 3:
+            raise mssql_python.OperationalError("General error", REANUDANDO)
+        return "conexion"
+
+    monkeypatch.setattr(mssql_python, "connect", conectar_falso)
+    monkeypatch.setattr(bd, "credencial", lambda: None)
+    monkeypatch.setattr(bd.time, "sleep", lambda s: None)
+    assert bd.conectar("servidor", "base") == "conexion"
+    assert len(intentos) == 3
+
+
+def test_conectar_no_reintenta_errores_de_permisos(monkeypatch):
+    import mssql_python
+
+    def conectar_falso(*args, **kwargs):
+        raise mssql_python.OperationalError("Login failed", "Login failed for user")
+
+    monkeypatch.setattr(mssql_python, "connect", conectar_falso)
+    monkeypatch.setattr(bd, "credencial", lambda: None)
+    with pytest.raises(bd.ErrorBD, match="Login failed"):
+        bd.conectar("servidor", "base")
+
+
 @pytest.mark.parametrize("script", sorted(p.name for p in SQL.glob("*.sql")))
 def test_scripts_sql_se_pueden_repetir(script):
     """Cada CREATE va protegido: IF ... IS NULL justo antes, o DROP ... IF EXISTS en el lote anterior.

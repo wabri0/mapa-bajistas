@@ -28,6 +28,7 @@ Trabajo final (Track B, arquitectura técnica): plataforma en Azure que sigue a 
 - Emisor nuevo sin código de Yahoo → aviso `INGESTA_CNMV_REVISAR` (pasó con Puig Brands, añadido como `PUIG.MC`).
 - Verificado en Azure el 9-nov (19:21 UTC, ejecución manual). Informe: `docs/informe/04_arquitectura.md` §4.3. 73 pruebas.
 - La extensión de Chrome se desconecta a veces: si falla, pedir al usuario que abra Chrome.
+- Incidencia 10–18-nov: la carga en SQL falló en todas las ejecuciones porque `mssql-python` no pone el número 40613 (base reanudándose) en el mensaje y no se reintentaba. Arreglado en `bd.reintentable` (también reconoce el texto). Para diagnosticar: Application Insights → Registros, modo KQL, `traces | where message has 'INGESTA_CNMV_FALLO'` (no hay `az` instalado).
 
 ## Arquitectura (prototipo)
 
@@ -64,7 +65,7 @@ python -m venv .venv && .venv/Scripts/pip install -r requirements.txt -r require
 .venv/Scripts/python -m src.limpieza.silver     # construye data/silver/cnmv/
 .venv/Scripts/python -m src.modelo.cargar --sin-bd # precios y tablas gold sin cargar en SQL (--forzar: carga en Azure SQL)
 .venv/Scripts/python -m src.modelo.bd sql/06_prueba_rls.sql  # ejecuta scripts en Azure SQL (abre el navegador la primera vez)
-.venv/Scripts/python -m pytest -q               # 73 pruebas (las de datos reales usan el Excel más reciente de data/raw)
+.venv/Scripts/python -m pytest -q               # 82 pruebas (las de datos reales usan el Excel más reciente de data/raw)
 ```
 
 Si la carpeta del proyecto cambia de sitio, el `.venv` deja de funcionar: hay que borrarlo y volver a crearlo con la primera línea.

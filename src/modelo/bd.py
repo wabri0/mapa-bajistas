@@ -19,9 +19,18 @@ from src.ingesta.cnmv import ErrorIngesta
 
 ESCOPO = "https://database.windows.net/.default"
 REGISTRO_SESION = Path.home() / ".mapa_bajistas" / "sesion_entra.json"
-# La base de datos gratuita se pausa sola: al despertarla, la primera conexión puede fallar
-INTENTOS, ESPERA_S = 5, 20
+# La base de datos gratuita se pausa sola tras 1 hora sin uso: al despertarla, la conexión falla
+# durante cerca de un minuto. mssql-python no incluye el número de error (40613) en el mensaje,
+# así que también se reconoce por el texto.
+INTENTOS, ESPERA_S = 8, 20
 CODIGOS_REINTENTO = ("40613", "40197", "40501", "49918", "49919", "49920", "4060", "10928", "10929")
+TEXTOS_REINTENTO = ("not currently available", "retry the connection later", "is busy",
+                    "timeout", "timed out", "Timeout")
+
+
+def reintentable(texto):
+    """True si el error es transitorio (base reanudándose o saturada) y conviene reintentar."""
+    return any(c in texto for c in CODIGOS_REINTENTO + TEXTOS_REINTENTO)
 SEPARADOR = re.compile(r"^\s*GO\s*;?\s*$", re.IGNORECASE | re.MULTILINE)
 
 
@@ -68,7 +77,7 @@ def conectar(servidor=None, base_datos=None, autocommit=True):
             return mssql_python.connect(cadena, autocommit=autocommit, token_provider=cred, timeout=60)
         except mssql_python.Error as e:
             texto = str(e)
-            if intento == INTENTOS or not any(c in texto for c in CODIGOS_REINTENTO + ("timeout", "Timeout")):
+            if intento == INTENTOS or not reintentable(texto):
                 raise ErrorBD(f"No se puede conectar a {servidor}/{base_datos}: {texto}") from e
             logging.info("La base de datos se está reanudando (intento %s): %s", intento, texto[:200])
             time.sleep(ESPERA_S)
