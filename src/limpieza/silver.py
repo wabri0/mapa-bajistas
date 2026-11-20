@@ -8,6 +8,11 @@ Reglas (documentadas en docs/informe/03_datos.md):
 - La CNMV no publica la mayoría de los avisos de cierre. Una posición que no sigue vigente
   y pasa más de CADUCIDAD_DIAS sin ningún aviso se da por cerrada CADUCIDAD_DIAS después del
   último (cierre inferido). El 99 % de los cierres publicados llega antes de 301 días.
+- La CNMV borra del fichero todo el historial de las empresas que dejan de cotizar (detectado el
+  19-nov-2026 con Minor Hotels, Quabit, Ercros, Tubos Reunidos y Liberbank). Esos avisos se
+  conservan, marcados con `visto_hasta` = última publicación en que aparecía la empresa, y sus
+  posiciones no se alargan más allá de esa fecha. Solo se conservan emisores retirados por
+  completo: si la empresa sigue en el fichero, manda la versión actual (puede corregir avisos).
 """
 import io
 import json
@@ -23,11 +28,12 @@ from src.ingesta import cnmv
 
 PREFIJO = "cnmv"
 # Cambiarla obliga a reconstruir la silver en Azure aunque no llegue un fichero nuevo
-VERSION_REGLAS = "2026-11-04 caducidad-365 grupos-revision"
+VERSION_REGLAS = "2026-11-20 conserva-emisores-retirados"
 UMBRAL = 0.5
 CADUCIDAD_DIAS = 365
 FECHA_MINIMA = pd.Timestamp("2010-01-01")
 CLAVE = ["lei", "tenedor", "fecha_posicion"]
+COLUMNAS_AVISO = ["lei", "isin", "emisor", "tenedor", "fecha_posicion", "pct"]
 TABLAS = ["notificaciones", "emisores", "fondos", "posiciones_intervalos", "posiciones_diarias"]
 GRUPOS = Path(__file__).with_name("grupos_gestores.csv")
 
@@ -115,7 +121,9 @@ def tabla_emisores(notif):
     em = notif.groupby("lei").agg(
         isins=("isin", lambda s: ",".join(sorted(s.unique()))),
         primera=("fecha_posicion", "min"), ultima=("fecha_posicion", "max"), notificaciones=("pct", "size"))
-    return em.join(ultimo).reset_index()[["lei", "emisor", "isins", "primera", "ultima", "notificaciones"]]
+    em = em.join(ultimo)
+    em["visto_hasta"] = notif.groupby("lei")["visto_hasta"].max() if "visto_hasta" in notif else pd.NaT
+    return em.reset_index()[["lei", "emisor", "isins", "primera", "ultima", "notificaciones", "visto_hasta"]]
 
 
 def intervalos(notif, vigentes, fecha_publicacion):
@@ -128,6 +136,11 @@ def intervalos(notif, vigentes, fecha_publicacion):
     sigue_viva = pd.Series([(l, t) in vigentes for l, t in zip(df["lei"], df["tenedor"])], index=df.index)
     df["vigente"] = es_ultima & sigue_viva
     df.loc[es_ultima, "hasta"] = pd.Timestamp(fecha_publicacion)
+    if "visto_hasta" in notif:
+        # Emisor que la CNMV ya no publica: nada se alarga más allá de su última publicación
+        tope = df["lei"].map(notif.groupby("lei")["visto_hasta"].max())
+        pasa = tope.notna() & (df["hasta"] > tope)
+        df.loc[pasa, "hasta"] = tope[pasa]
     # Sin aviso de cierre: como mucho CADUCIDAD_DIAS tras el último aviso (salvo que siga vigente)
     limite = df["desde"] + pd.Timedelta(days=CADUCIDAD_DIAS)
     caduca = ~df["vigente"] & (df["hasta"] > limite)
@@ -174,10 +187,16 @@ def controles(notif, vigentes_crudas, diarias, fecha_publicacion, informe):
     return criticos
 
 
-def construir(libro, fecha_publicacion, captura_utc=None, previas=None):
-    """Devuelve (tablas, informe). `previas` = notificaciones de la silver anterior, para fechar capturas."""
+def construir(libro, fecha_publicacion, captura_utc=None, previas=None, retiradas=None):
+    """Devuelve (tablas, informe).
+
+    `previas` = notificaciones de la silver anterior, para fechar capturas.
+    `retiradas` = avisos de emisores que la CNMV ya no publica, con su `visto_hasta`; se añaden los
+    de los emisores que no están en este fichero.
+    """
     crudas = leer_notificaciones(libro)
     notif, vigentes, informe = limpiar(crudas)
+    leis_actuales = set(notif["lei"])
 
     # Dos fechas: la de la posición y la de la primera captura en la que apareció la notificación
     # (sin silver previa = carga histórica: la fecha de captura queda vacía)
@@ -189,6 +208,18 @@ def construir(libro, fecha_publicacion, captura_utc=None, previas=None):
         nuevas = notif.pop("_merge").eq("left_only")
         notif.loc[nuevas, "fecha_primera_captura"] = pd.Timestamp(captura_utc).tz_convert(None)
         informe["notificaciones_nuevas"] = int(nuevas.sum())
+    notif["visto_hasta"] = pd.NaT
+    informe["emisores_retirados_cnmv"] = []
+    if retiradas is not None and len(retiradas):
+        extra = retiradas[~retiradas["lei"].isin(leis_actuales)].copy()
+        if "fecha_primera_captura" not in extra:
+            extra["fecha_primera_captura"] = pd.NaT
+        extra = extra[COLUMNAS_AVISO + ["fecha_primera_captura", "visto_hasta"]]
+        notif = pd.concat([notif, extra], ignore_index=True)
+        informe["emisores_retirados_cnmv"] = sorted(extra["emisor"].unique())
+        informe["notificaciones_retiradas_cnmv"] = len(extra)
+    notif["fecha_primera_captura"] = pd.to_datetime(notif["fecha_primera_captura"])
+    notif["visto_hasta"] = pd.to_datetime(notif["visto_hasta"])
     fondos = tabla_fondos(notif)
     notif = notif.merge(fondos[["tenedor", "grupo_gestor"]], on="tenedor", how="left")
     if previas is not None and len(previas):
@@ -210,6 +241,49 @@ def construir(libro, fecha_publicacion, captura_utc=None, previas=None):
     return tablas, informe
 
 
+def capturas_bronze(almacen_bronze):
+    """Rutas de todas las capturas guardadas en bronze, de la más antigua a la más reciente."""
+    from src.ingesta.ejecutar import PREFIJO as BRONZE
+
+    return [r for r in almacen_bronze.listar(f"{BRONZE}/fecha_publicacion=") if r.endswith(".xls")]
+
+
+def leer_captura(almacen_bronze, ruta):
+    """Avisos limpios de una captura de bronze y su fecha de publicación."""
+    libro = cnmv.abrir(almacen_bronze.leer_bytes(ruta))
+    notif, _, _ = limpiar(leer_notificaciones(libro))
+    return notif, cnmv.fecha_publicacion(libro)
+
+
+def retiradas_en_bronze(almacen_bronze, leis_actuales, lector=leer_captura):
+    """Avisos de los emisores que ya no están en el fichero actual, sacados de las capturas de bronze.
+
+    Se recorren de la más reciente a la más antigua y, de cada emisor, se toman los avisos de la
+    última captura en que aparecía; `visto_hasta` = la fecha de publicación de esa captura.
+    """
+    encontrados = {}
+    for ruta in reversed(capturas_bronze(almacen_bronze)):
+        notif, fecha = lector(almacen_bronze, ruta)
+        for lei, grupo in notif[~notif["lei"].isin(leis_actuales)].groupby("lei"):
+            if lei not in encontrados:
+                encontrados[lei] = grupo.assign(visto_hasta=pd.Timestamp(fecha))
+    if not encontrados:
+        return None
+    return pd.concat(encontrados.values(), ignore_index=True)[COLUMNAS_AVISO + ["visto_hasta"]]
+
+
+def retiradas_de_previas(previas, fecha_previa):
+    """Avisos de la silver anterior con su `visto_hasta`; los que no lo tienen aparecían en la publicación anterior."""
+    if previas is None or not len(previas):
+        return None
+    r = previas.copy()
+    if "visto_hasta" not in r:
+        r["visto_hasta"] = pd.NaT
+    if fecha_previa:
+        r["visto_hasta"] = pd.to_datetime(r["visto_hasta"]).fillna(pd.Timestamp(fecha_previa))
+    return r[COLUMNAS_AVISO + ["fecha_primera_captura", "visto_hasta"]]
+
+
 def a_parquet(df):
     buf = io.BytesIO()
     df.to_parquet(buf, index=False)
@@ -226,8 +300,23 @@ def ejecutar(almacen_bronze, almacen_silver, captura_utc=None):
     libro = cnmv.abrir(almacen_bronze.leer_bytes(estado["ruta"]))
     previas_bytes = almacen_silver.leer_bytes(f"{PREFIJO}/notificaciones.parquet")
     previas = pd.read_parquet(io.BytesIO(previas_bytes)) if previas_bytes else None
+    calidad_previa = json.loads(almacen_silver.leer_texto(f"{PREFIJO}/calidad.json") or "{}")
+    retiradas = retiradas_de_previas(previas, calidad_previa.get("fecha_publicacion"))
+    if previas is None or calidad_previa.get("version_reglas") != VERSION_REGLAS:
+        # Reconstrucción completa: se repasan todas las capturas de bronze por si la CNMV ya
+        # borró algún emisor antes de que existiera esta regla
+        actuales = set(leer_notificaciones(libro)["lei"])
+        en_bronze = retiradas_en_bronze(almacen_bronze, actuales)
+        if en_bronze is not None:
+            if retiradas is not None:  # conserva la fecha de primera captura que hubiera
+                en_bronze = en_bronze.merge(retiradas[CLAVE + ["pct", "fecha_primera_captura"]].drop_duplicates(CLAVE + ["pct"]),
+                                            on=CLAVE + ["pct"], how="left")
+                otros = retiradas[~retiradas["lei"].isin(set(en_bronze["lei"]))]
+                retiradas = pd.concat([en_bronze, otros], ignore_index=True)
+            else:
+                retiradas = en_bronze
     tablas, informe = construir(libro, date.fromisoformat(estado["fecha_publicacion"]),
-                                captura_utc or estado["captura_utc"], previas)
+                                captura_utc or estado["captura_utc"], previas, retiradas)
     informe["origen_bronze"] = estado["ruta"]
     informe["version_reglas"] = VERSION_REGLAS
     if informe["criticos"]:

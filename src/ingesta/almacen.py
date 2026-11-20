@@ -35,6 +35,13 @@ class AlmacenLocal:
     def describir(self, ruta):
         return str(self.raiz / ruta)
 
+    def listar(self, prefijo):
+        """Rutas (con /) de los ficheros que empiezan por `prefijo`, ordenadas."""
+        if not self.raiz.exists():
+            return []
+        rutas = (p.relative_to(self.raiz).as_posix() for p in self.raiz.rglob("*") if p.is_file())
+        return sorted(r for r in rutas if r.startswith(prefijo))
+
 
 class AlmacenBlob:
     """Contenedor de Azure Blob Storage.
@@ -89,3 +96,7 @@ class AlmacenBlob:
 
     def describir(self, ruta):
         return f"{self.contenedor.url}/{ruta}"
+
+    def listar(self, prefijo):
+        """Nombres de los blobs que empiezan por `prefijo`, ordenados."""
+        return sorted(b.name for b in self.contenedor.list_blobs(name_starts_with=prefijo))

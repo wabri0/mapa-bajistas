@@ -226,3 +226,55 @@ def test_fichero_real_sin_grupos_pendientes_y_detecta_fondos_nuevos(tmp_path):
     destino.escribir_bytes("cnmv/notificaciones.parquet", silver.a_parquet(sin_wq), sobrescribir=True)
     informe = silver.ejecutar(bronze, destino, captura_utc="2026-11-04T20:00:00+00:00")
     assert informe["fondos_nuevos"] == ["WorldQuant, LLC"] and informe["criticos"] == []
+
+
+# ---------- Emisores que la CNMV borra del fichero ----------
+
+LEI_Z = "Z" * 20
+
+
+def test_un_emisor_retirado_no_se_alarga_mas_alla_de_su_ultima_publicacion():
+    notif, vigentes, _ = silver.limpiar(filas((ANT, LEI_A, "ES0000000001", "Fondo X", "2026-10-01", 0.7)))
+    notif["visto_hasta"] = pd.Timestamp("2026-10-20")
+    tramos = silver.intervalos(notif, vigentes, PUBLICACION)
+    assert tramos.loc[0, "hasta"] == pd.Timestamp("2026-10-20")  # sin tope llegaría al 3-nov
+
+
+def test_retiradas_en_bronze_toma_la_ultima_captura_en_que_aparecia(tmp_path):
+    almacen = AlmacenLocal(tmp_path)
+    capturas = {}
+    for dia, leis in [("2026-11-10", [LEI_A, LEI_Z]), ("2026-11-18", [LEI_A, LEI_Z]), ("2026-11-19", [LEI_A])]:
+        ruta = f"cnmv/net_short_positions/fecha_publicacion={dia}/NetShortPositions_{dia}_captura.xls"
+        almacen.escribir_bytes(ruta, b"x")
+        capturas[ruta] = (pd.DataFrame({"lei": leis, "isin": "ES0000000001", "emisor": "E", "tenedor": "F",
+                                        "fecha_posicion": pd.Timestamp("2015-01-02"), "pct": 0.6}), date.fromisoformat(dia))
+    almacen.escribir_bytes("cnmv/net_short_positions/rechazados/NetShortPositions_capturaX.xls", b"x")
+    retiradas = silver.retiradas_en_bronze(almacen, {LEI_A}, lector=lambda _, ruta: capturas[ruta])
+    assert retiradas["lei"].tolist() == [LEI_Z]
+    assert retiradas["visto_hasta"].tolist() == [pd.Timestamp("2026-11-18")]
+
+
+@requiere_excel
+def test_se_conservan_los_emisores_borrados_por_la_cnmv_pero_no_las_correcciones(tmp_path):
+    from src.ingesta.ejecutar import ingestar
+
+    bronze, destino = AlmacenLocal(tmp_path / "bronze"), AlmacenLocal(tmp_path / "silver")
+    ingestar(bronze, contenido=EXCEL.read_bytes(), cabeceras={})
+    silver.ejecutar(bronze, destino)
+    previas = pd.read_parquet(tmp_path / "silver" / "cnmv" / "notificaciones.parquet")
+    # La silver anterior tenía un emisor que el fichero ya no trae y un aviso de un emisor
+    # que sigue en el fichero pero que la CNMV ha corregido (borrado)
+    retirado = previas.iloc[[0]].assign(lei=LEI_Z, emisor="EMPRESA EXCLUIDA, S.A.", pct=0.9)
+    corregido = previas.iloc[[0]].assign(fecha_posicion=pd.Timestamp("2010-07-01"), pct=0.77)
+    destino.escribir_bytes("cnmv/notificaciones.parquet", silver.a_parquet(pd.concat([previas, retirado, corregido])),
+                           sobrescribir=True)
+    informe = silver.ejecutar(bronze, destino)
+    notif = pd.read_parquet(tmp_path / "silver" / "cnmv" / "notificaciones.parquet")
+    assert informe["emisores_retirados_cnmv"] == ["EMPRESA EXCLUIDA, S.A."] and not informe["criticos"]
+    conservado = notif[notif["lei"] == LEI_Z]
+    assert len(conservado) == 1
+    assert conservado["visto_hasta"].iloc[0] == pd.Timestamp(informe["fecha_publicacion"])
+    assert not ((notif["pct"] == 0.77) & (notif["fecha_posicion"] == "2010-07-01")).any()
+    assert notif.loc[notif["lei"] != LEI_Z, "visto_hasta"].isna().all()
+    emisores = pd.read_parquet(tmp_path / "silver" / "cnmv" / "emisores.parquet")
+    assert emisores.loc[emisores["lei"] == LEI_Z, "visto_hasta"].notna().all()
