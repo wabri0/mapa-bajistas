@@ -80,6 +80,7 @@ Si la carpeta del proyecto cambia de sitio, el `.venv` deja de funcionar: hay qu
 
 - Código, comentarios, commits y documentación en **español**; identificadores en español (`ingestar`, `posiciones_diarias`).
 - **Commits sin ninguna firma de Claude** (ni `Co-Authored-By` ni pie de «Generated with Claude Code»). Commits y push a `main` forman parte del flujo habitual.
+- **Tras cada despliegue que haya que verificar en Azure, forzar siempre la ejecución de la Function** en lugar de esperar al temporizador: esperar a que GitHub Actions termine con éxito y lanzarla desde el portal (`func-mapa-bajistas` → `ingesta_cnmv` → Código y prueba → Probar/Ejecutar → Ejecutar; responde «202 Aceptado»). Luego comprobar en la base de datos (`dw.carga`) o en Application Insights. Abrir el portal en una pestaña nueva: la de Registros pide confirmación al salir.
 - En el portal de Azure: Claude rellena los formularios (con la extensión de Chrome) y **el usuario pulsa «Crear»** en los recursos nuevos. Las asignaciones de roles IAM las hace el usuario (el sistema de permisos no deja hacerlas a Claude).
 - Cada fase cierra con su parte del informe en `docs/informe/` (borradores por sección).
 - El usuario está aprendiendo Azure: explicar en lenguaje llano, con ejemplos reales y, cuando ayude, con esquemas visuales (no ASCII).
