@@ -155,7 +155,9 @@ def test_fichero_real_cuadra_con_la_cnmv_y_se_guarda(tmp_path):
     ingestar(bronze, contenido=EXCEL.read_bytes(), cabeceras={})
     informe = silver.ejecutar(bronze, destino)
     assert informe["criticos"] == [] and informe["cuadre_vigentes"]["descuadres"] == []
-    assert informe["notificaciones"] > 12000 and informe["emisores"] >= 80
+    # La CNMV borra el historial de las empresas que dejan de cotizar (19-nov-2026: de 81 a 76),
+    # así que el número de emisores puede bajar; solo se comprueba que el fichero no venga recortado
+    assert informe["notificaciones"] > 12000 and informe["emisores"] >= 70
     diarias = pd.read_parquet(tmp_path / "silver" / "cnmv" / "posiciones_diarias.parquet")
     assert diarias["fecha"].dt.day_of_week.max() <= 4
 
