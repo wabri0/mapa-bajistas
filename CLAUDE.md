@@ -15,7 +15,7 @@ Trabajo final (Track B, arquitectura técnica): plataforma en Azure que sigue a 
 
 ## Fase 3: resumen (hecha)
 
-- **Azure SQL** (oferta gratuita, cobro por exceso desactivado, France Central): servidor `sql-mapa-bajistas`, base `sqldb-mapa-bajistas`, solo Entra (admin `ggomeama@myuax.com`), firewall con servicios de Azure e IP 81.43.33.72 (si cambia la IP del usuario, hay que añadirla en el portal). Usuario `[func-mapa-bajistas]` con `rol_carga`. Function con `SQL_SERVIDOR`, `SQL_BASE_DATOS` y **2048 MB**.
+- **Azure SQL** (oferta gratuita, cobro por exceso desactivado, France Central): servidor `sql-mapa-bajistas`, base `sqldb-mapa-bajistas`, solo Entra (admin `ggomeama@myuax.com`), firewall con servicios de Azure e IPs 81.43.33.72 y 81.43.35.239 (la IP del usuario cambia de vez en cuando: si la conexión local falla con «Client with IP address … is not allowed», añadirla en el portal → servidor → Redes). Usuario `[func-mapa-bajistas]` con `rol_carga`. Function con `SQL_SERVIDOR`, `SQL_BASE_DATOS` y **2048 MB**.
 - **Código:** `src/modelo/precios.py` (yfinance, descarga completa en 6 s → `silver/yahoo/precios.parquet`; dato del día solo tras las 17 UTC; si Yahoo falla, aviso `INGESTA_CNMV_REVISAR` y precios anteriores), `gold.py` (día de bolsa = IBEX o ≥ 10 acciones con volumen; futuros con regla de festivos), `bd.py` (identidad administrada en Azure; en local, navegador una vez y sesión en `~/.mapa_bajistas`), `cargar.py` (stg → `dw.usp_cargar` en una transacción; estado en `silver/gold/estado.json` para no despertar la base cada hora). Scripts `sql/01`–`06`. Subir `VERSION_MODELO` en `gold.py` si cambia el modelo (fuerza la recarga).
 - **Verificado:** primera carga local en 25 s (215.680 posiciones, 279.625 precios, 12.370 notificaciones); carga automática de la Function el 9-nov a las 19:00 UTC (`dw.carga` id 2, fichero del 6-nov). RLS probada con `demo_cliente_a` (Grifols), `demo_cliente_b` (Solaria) y `demo_consultora`. Cifras de Grifols y Solaria iguales desde SQL. Sección del informe: `docs/informe/04_arquitectura.md` §4.2.
 
@@ -28,6 +28,7 @@ Trabajo final (Track B, arquitectura técnica): plataforma en Azure que sigue a 
 - Emisor nuevo sin código de Yahoo → aviso `INGESTA_CNMV_REVISAR` (pasó con Puig Brands, añadido como `PUIG.MC`).
 - Verificado en Azure el 9-nov (19:21 UTC, ejecución manual). Informe: `docs/informe/04_arquitectura.md` §4.3. 73 pruebas.
 - La extensión de Chrome se desconecta a veces: si falla, pedir al usuario que abra Chrome.
+- Hallazgo 20-nov: la CNMV **borra del Excel el historial de las empresas que dejan de cotizar**. El fichero del 19-nov ya no trae a Minor Hotels (97 avisos), Quabit, Ercros, Tubos Reunidos ni Liberbank (81 → 76 emisores, 12.390 → 12.268 avisos), así que desaparecen también de silver y de los hechos de SQL (las dimensiones las conservan). Bronze guarda los ficheros antiguos. Pendiente de que el usuario decida si conservar ese historial.
 - Incidencia 10–18-nov: la carga en SQL falló en todas las ejecuciones porque `mssql-python` no pone el número 40613 (base reanudándose) en el mensaje y no se reintentaba. Arreglado en `bd.reintentable` (también reconoce el texto). Para diagnosticar: Application Insights → Registros, modo KQL, `traces | where message has 'INGESTA_CNMV_FALLO'` (no hay `az` instalado).
 
 ## Arquitectura (prototipo)
