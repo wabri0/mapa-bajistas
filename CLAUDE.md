@@ -2,7 +2,7 @@
 
 Trabajo final (Track B, arquitectura técnica): plataforma en Azure que sigue a diario las posiciones cortas netas que publica la CNMV, las cruza con la cotización y avisa a cada cliente (cotizadas atendidas por una consultora de relación con inversores), con los datos de cada cliente aislados. Entrega: 10-ene-2027. El plan por fases está en [docs/planning.md](docs/planning.md); el usuario pide «procede con la fase N».
 
-## Estado (actualizado el 9-nov-2026)
+## Estado (actualizado el 20-nov-2026)
 
 | Fase | Estado |
 | --- | --- |
@@ -11,7 +11,18 @@ Trabajo final (Track B, arquitectura técnica): plataforma en Azure que sigue a 
 | 2 · Limpieza (silver) | Hecha y en producción, verificada en Azure |
 | 3 · Base de datos SQL, precios, clientes y RLS | Hecha y en producción (9-nov): la Function carga Azure SQL sola |
 | 4 · Indicadores y alertas | Hecha y en producción (9-nov) |
-| 5–7 | Pendientes (ver planning). Siguiente: fase 5, panel en Power BI |
+| 5 · Panel Power BI | En curso: proyecto PBIP generado (`scripts/generar_powerbi.py` → `powerbi/`), validado contra esquemas y TMDL; falta que el usuario conecte Power BI Desktop (error de credenciales pendiente; plan B: ficheros locales) |
+| 6–7 | Pendientes (ver planning) |
+
+## Última verificación completa (20-nov-2026, 17:20 UTC): todo correcto
+
+Con `scripts/verificar_plataforma.py` (solo lee; usa la sesión de Microsoft guardada en local y consulta Azure por API, sin portal):
+- **Fuente:** la CNMV responde; último fichero publicado el 19-nov a las 19:19 UTC.
+- **Despliegue:** último GitHub Actions `b29b407`, correcto.
+- **Function:** `Running`, Python 3.14, 2048 MB, temporizador `0 0 13-21 * * 1-5`, variables `BRONZE_*` y `SQL_*` presentes, `ingesta_cnmv` activa. Alerta por correo activa. Presupuesto: 0,30 € de 1 € en noviembre.
+- **Ejecuciones (Application Insights):** fallos todos los días del 13 al 18-nov (incidencia del reintento, resuelta); desde el arreglo del 18-nov, todas correctas (19-nov: 9/9 con carga en SQL y una alerta nueva de Solaria para el cliente B).
+- **Base de datos:** online, oferta gratuita con pausa automática. Carga 11 (20-nov 17:16 UTC, forzada a mano) con el fichero del 19-nov y las reglas `2026-11-20 conserva-emisores-retirados`: 216.641 posiciones, 280.944 precios, 93.698 indicadores, 12.426 avisos, 81 emisores (todos con avisos), 230 fondos, 74 alertas (A 53, B 21), 8 reglas activas. RLS correcta (nadie ve alertas de otro cliente; escritura cruzada bloqueada; tabla de usuarios sin permiso).
+- **Limitación:** la cuenta del usuario no tiene rol de lectura de datos en `stmapabajistas`, así que la verificación no lista los blobs; el fichero cargado se comprueba en `dw.carga`.
 
 ## Fase 3: resumen (hecha)
 
@@ -66,6 +77,7 @@ python -m venv .venv && .venv/Scripts/pip install -r requirements.txt -r require
 .venv/Scripts/python -m src.limpieza.silver     # construye data/silver/cnmv/
 .venv/Scripts/python -m src.modelo.cargar --sin-bd # precios y tablas gold sin cargar en SQL (--forzar: carga en Azure SQL)
 .venv/Scripts/python -m src.modelo.bd sql/06_prueba_rls.sql  # ejecuta scripts en Azure SQL (abre el navegador la primera vez)
+.venv/Scripts/python scripts/verificar_plataforma.py  # verificación completa de Azure (solo lee)
 .venv/Scripts/python -m pytest -q               # 85 pruebas (las de datos reales usan el Excel más reciente de data/raw)
 ```
 
